@@ -1,0 +1,26 @@
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data & Models
+data/
+results/
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# IDEs
+.vscode/
+.idea/
+.ipynb_checkpoints/
