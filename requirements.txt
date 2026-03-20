@@ -4,4 +4,8 @@ accelerate>=0.29.0
 numpy
 scikit-learn
 matplotlib
+datasets
+requests
+pandas
 pytest
+scipy
