@@ -1,8 +1,16 @@
 import os
+import sys
+from pathlib import Path
+
 import torch
 import matplotlib.pyplot as plt
-from src.extraction import LatentExtractor
-from src.theta import ThetaBiomarker
+
+_SRC = Path(__file__).resolve().parent.parent / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
+
+from extraction import LatentExtractor    # type: ignore[import-untyped]
+from theta import ThetaBiomarker          # type: ignore[import-untyped]
 
 
 def main():
