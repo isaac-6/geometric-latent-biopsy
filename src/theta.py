@@ -157,8 +157,6 @@ class ThetaBiomarker:
             # 1. Dimension pruning by normative variance
             if self.top_d_dims is not None and self.top_d_dims < D:
                 var    = X.var(axis=0)
-                top_d  = int(np.argsort(var)[::-1][: self.top_d_dims])
-                # argsort returns array, fix:
                 top_di = np.argsort(var)[::-1][: self.top_d_dims]
                 X_sel  = X[:, top_di]
             else:
