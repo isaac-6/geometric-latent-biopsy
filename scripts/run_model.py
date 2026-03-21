@@ -285,6 +285,11 @@ def main() -> None:
 
     # ---- 4. Stability analysis ----
     layers_str = [str(l) for l in args.stability_layers]
+    eval_dir    = root / "eval"
+    figures_dir = root / "figures"
+    eval_dir.mkdir(exist_ok=True)
+    figures_dir.mkdir(exist_ok=True)
+
     run_step([
         sys.executable, "scripts/stability_analysis.py",
         "--model", args.model,
@@ -293,6 +298,7 @@ def main() -> None:
         "--benign-agg-n", str(args.benign_agg_n),
         "--layers", *layers_str,
         "--target-layer", str(args.stability_layers[-1]),
+        "--output-dir", str(eval_dir),
         "--seed", str(args.seed),
     ], log_dir, "02_stability")
 
@@ -306,6 +312,7 @@ def main() -> None:
         "--normative-fit-n", str(norm_fit_n),
         "--harmful-fit-n",   str(harm_fit_n),
         "--strategy", args.strategy,
+        "--output-dir", str(eval_dir),
         "--seed", str(args.seed),
     ], log_dir, "03_evaluate")
 
@@ -319,6 +326,7 @@ def main() -> None:
         "--normative-fit-n", str(norm_fit_n),
         "--harmful-fit-n",   str(harm_fit_n),
         "--layer", "19",
+        "--figures-dir", str(figures_dir),
         "--strategy", args.strategy,
         "--seed", str(args.seed),
     ], log_dir, "04_theta_phi")
@@ -326,6 +334,9 @@ def main() -> None:
     # ---- 7. Write manifest ----
     manifest = {
         "model":               args.model,
+        "output_root":         str(root),
+        "eval_dir":            str(eval_dir),
+        "figures_dir":         str(figures_dir),
         "timestamp":           datetime.now().isoformat(),
         "normative_fit_n":     norm_fit_n,
         "harmful_fit_n":       harm_fit_n,

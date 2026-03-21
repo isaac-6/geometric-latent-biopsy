@@ -62,7 +62,7 @@ if str(_SRC) not in sys.path:
 from extraction import LatentExtractor   # type: ignore[import-untyped]
 from theta import ThetaBiomarker         # type: ignore[import-untyped]
 
-RESULTS_DIR = Path("results/eval")
+RESULTS_DIR = Path("results/eval")  # overridden at runtime by --output-dir
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +164,8 @@ def auroc_at_layer_harmful_ref(
 
 def main() -> None:
     args = parse_args()
+    global RESULTS_DIR
+    RESULTS_DIR = Path(args.output_dir)
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     random.seed(args.seed)
 
@@ -442,6 +444,8 @@ def parse_args() -> argparse.Namespace:
                         "Recommended: --layers 0 6 12 19 22")
     p.add_argument("--target-layer",    type=int, default=19,
                    help="Layer shown in the two-ordering robustness panel.")
+    p.add_argument("--output-dir",      default="results/eval",
+                   help="Output directory. Default: results/eval.")
     p.add_argument("--seed",            type=int, default=42)
     return p.parse_args()
 

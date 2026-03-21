@@ -126,7 +126,8 @@ def compute_theta_phi(
 
 def main() -> None:
     args = parse_args()
-    os.makedirs("results/figures", exist_ok=True)
+    figures_dir = Path(args.figures_dir)
+    figures_dir.mkdir(parents=True, exist_ok=True)
     random.seed(args.seed)
 
     # ---- Load prompts ----
@@ -186,15 +187,16 @@ def main() -> None:
         theta_by_cat = {n: theta_all[idx[i]:idx[i+1]] for i, n in enumerate(cat_names)}
         phi_by_cat   = {n: phi_all[idx[i]:idx[i+1]]   for i, n in enumerate(cat_names)}
 
-        _plot(theta_by_cat, phi_by_cat, layer, strategy, ref_label, args)
+        _plot(theta_by_cat, phi_by_cat, layer, strategy, ref_label, figures_dir, args)
 
 def _plot(
-    theta:     dict[str, np.ndarray],
-    phi:       dict[str, np.ndarray],
-    layer:     int,
-    strategy:  str,
-    ref_label: str,
-    args:      argparse.Namespace,
+    theta:       dict[str, np.ndarray],
+    phi:         dict[str, np.ndarray],
+    layer:       int,
+    strategy:    str,
+    ref_label:   str,
+    figures_dir: Path,
+    args:        argparse.Namespace,
 ) -> None:
     """
     Render the theta-phi plane.  Each point is at (theta*cos(phi), theta*sin(phi)).
@@ -253,7 +255,7 @@ def _plot(
     ax.set_ylabel("theta * sin(phi)  (Orthogonal PC 2)", fontsize=11)
     ax.legend(loc="upper right", fontsize=9, framealpha=0.9)
 
-    out = f"results/figures/theta_phi_{strategy}_layer{layer}.png"
+    out = str(figures_dir / f"theta_phi_{strategy}_layer{layer}.png")
     plt.savefig(out, dpi=200, bbox_inches="tight")
     plt.close()
     print(f"Saved -> {out}")
@@ -281,6 +283,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--layer",           type=int, default=19)
     p.add_argument("--strategy",        default="normative_ref",
                    choices=["normative_ref", "harmful_ref", "both"])
+    p.add_argument("--figures-dir",     default="results/figures",
+                   help="Output directory for figures.")
     p.add_argument("--seed",            type=int, default=42)
     return p.parse_args()
 

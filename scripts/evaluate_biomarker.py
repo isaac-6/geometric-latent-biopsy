@@ -89,7 +89,7 @@ from theta import ThetaBiomarker, compute_theta_core  # type: ignore[import-unty
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
-RESULTS_BASE = Path("results/eval")
+RESULTS_BASE = Path("results/eval")  # overridden at runtime by --output-dir
 
 
 # ===========================================================================
@@ -731,6 +731,8 @@ def run_strategy(
 
 def main() -> None:
     args = parse_args()
+    global RESULTS_BASE
+    RESULTS_BASE = Path(args.output_dir)
     random.seed(args.seed)
 
     strategies = (["normative_ref", "harmful_ref"]
@@ -916,6 +918,8 @@ def parse_args() -> argparse.Namespace:
                         "'normative_ref' requires no harmful examples at fit "
                         "time. 'harmful_ref' is a supervised variant. "
                         "'both' runs sequentially. Default: normative_ref")
+    p.add_argument("--output-dir",      default="results/eval",
+                   help="Root directory for all eval outputs. ""Default: results/eval. Override to results/<model>/eval ""when running via run_model.py.")
     p.add_argument("--seed",            type=int, default=42)
     return p.parse_args()
 
