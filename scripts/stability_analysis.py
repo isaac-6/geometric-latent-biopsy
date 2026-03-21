@@ -135,6 +135,29 @@ def auroc_at_layer(
     return auroc_h, auroc_b
 
 
+def auroc_at_layer_harmful_ref(
+    harm_acts_fit:  torch.Tensor,
+    harm_acts_eval: torch.Tensor,
+    norm_acts_eval: torch.Tensor,
+    benign_acts:    torch.Tensor,
+    layer: int,
+) -> tuple[float, float]:
+    """
+    Harmful-reference stability: fit on harm_acts_fit, score held-out sets.
+    Auto-orientation ensures harm > norm on average.
+    Returns (AUROC_harmful_vs_norm, AUROC_harmful_vs_benign).
+    """
+    bm = ThetaBiomarker(n_directions=1, n_gmm_components=1,
+                        layer_indices=[layer])
+    bm.fit(harm_acts_fit)
+    s_norm   = -bm.score_batch(norm_acts_eval)
+    s_harm   = -bm.score_batch(harm_acts_eval)
+    s_benign = -bm.score_batch(benign_acts)
+    if float(np.mean(s_harm)) < float(np.mean(s_norm)):
+        s_norm, s_harm, s_benign = -s_norm, -s_harm, -s_benign
+    return compute_auroc(s_norm, s_harm), compute_auroc(s_benign, s_harm)
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -234,6 +257,51 @@ def main() -> None:
                 })
             print(" done")
 
+    # ---- Harmful-ref stability ----
+    N_harm = harm_acts.shape[0]
+    n_harm_eval    = max(20, int(0.20 * N_harm))
+    n_harm_fit_max = N_harm - n_harm_eval
+    harm_acts_eval_stab = harm_acts[n_harm_fit_max:]
+    harm_acts_fit_pool  = harm_acts[:n_harm_fit_max]
+    print(f"\nHarmful pool: {n_harm_fit_max} fit / {n_harm_eval} eval (held-out)")
+
+    harm_sizes_raw = np.unique(np.round(
+        np.geomspace(max(10, int(0.02 * n_harm_fit_max)),
+                     n_harm_fit_max, num=20)).astype(int))
+    harm_sizes: list[int] = [int(s) for s in harm_sizes_raw
+                              if 2 <= s <= n_harm_fit_max]
+    if harm_sizes[-1] != n_harm_fit_max:
+        harm_sizes.append(n_harm_fit_max)
+
+    harm_rows: list[dict] = []
+    for ordering in ("forward", "reverse"):
+        print(f"\nHarmful-ref {ordering} stability...")
+        def harm_subset_fn(n: int, _ord: str = ordering) -> torch.Tensor:
+            return (harm_acts_fit_pool[:n]
+                    if _ord == "forward"
+                    else harm_acts_fit_pool[n_harm_fit_max - n:])
+        for layer in layers:
+            print(f"  Layer {layer} ...", end="", flush=True)
+            for n in harm_sizes:
+                subset = harm_subset_fn(n)
+                auroc_h, auroc_b = auroc_at_layer_harmful_ref(
+                    subset, harm_acts_eval_stab, norm_acts_eval,
+                    benign_acts, layer
+                )
+                harm_rows.append({"ordering": ordering, "layer": layer,
+                                  "n": n, "auroc_harmful": auroc_h,
+                                  "auroc_harmful_vs_benign": auroc_b})
+            print(" done")
+
+    df_harm = pd.DataFrame(harm_rows)
+    out_csv_harm = RESULTS_DIR / "stability_harmful_ref_summary.csv"
+    df_harm.to_csv(out_csv_harm, index=False)
+    print(f"\nSaved → {out_csv_harm}")
+    _plot_auroc_stability(df_harm, layers, args.target_layer,
+                          title_suffix=" (harmful-ref)",
+                          out_name="stability_auroc_harmful_ref.png")
+
+    # ---- Normative-ref ----
     df = pd.DataFrame(all_rows)
     out_csv = RESULTS_DIR / "stability_summary.csv"
     df.to_csv(out_csv, index=False)
@@ -251,16 +319,13 @@ def _plot_auroc_stability(
     df: pd.DataFrame,
     layers: list[int],
     target_layer: int,
+    title_suffix: str = "",
+    out_name: str = "stability_auroc.png",
 ) -> None:
     """
-    Primary stability figure. Two panels:
-
-    Left  — AUROC(N) for harmful detection at every analysed layer (forward).
-            Shows which layer converges fastest and what plateau value is.
-
-    Right — AUROC(N) at target_layer for both comparisons (harmful-vs-norm
-            and harmful-vs-benign-agg), overlaid for forward and reverse
-            orderings.  Demonstrates robustness to prompt ordering.
+    Primary stability figure (two panels).
+    title_suffix: appended to panel titles (e.g. " (harmful-ref strategy)").
+    out_name: output filename under RESULTS_DIR.
     """
     cmap = plt.get_cmap("viridis")
     layer_colors = {l: cmap(i / max(len(layers) - 1, 1))
@@ -281,7 +346,7 @@ def _plot_auroc_stability(
     ax.set_xscale("log")
     ax.set_xlabel("Normative set size (N)")
     ax.set_ylabel("AUROC — harmful vs normative")
-    ax.set_title("Harmful detection AUROC vs N\n(forward ordering, all layers)")
+    ax.set_title(f"Harmful detection AUROC vs N{title_suffix}\n(forward ordering, all layers)")
     ax.legend(fontsize=8, ncol=2)
     ax.set_ylim(0.4, 1.02)
     ax.grid(True, alpha=0.3)
@@ -306,7 +371,7 @@ def _plot_auroc_stability(
     ax.set_xlabel("Normative set size (N)")
     ax.set_ylabel("AUROC")
     ax.set_title(
-        f"AUROC vs N — Layer {target_layer}\n"
+        f"AUROC vs N — Layer {target_layer}{title_suffix}\n"
         "Forward vs reverse ordering (ordering robustness)"
     )
     ax.legend(fontsize=9)
@@ -314,7 +379,7 @@ def _plot_auroc_stability(
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    out = RESULTS_DIR / "stability_auroc.png"
+    out = RESULTS_DIR / out_name
     plt.savefig(out, dpi=200, bbox_inches="tight")
     plt.close()
     print(f"Saved → {out}")
@@ -370,8 +435,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--harmful-file",    default="data/raw/harmful.txt")
     p.add_argument("--benign-agg-file", default="data/raw/benign_aggressive.txt")
     p.add_argument("--normative-n",     type=int, default=500)
-    p.add_argument("--harmful-n",       type=int, default=200)
-    p.add_argument("--benign-agg-n",    type=int, default=200)
+    p.add_argument("--harmful-n",       type=int, default=520)
+    p.add_argument("--benign-agg-n",    type=int, default=250)
     p.add_argument("--layers",          type=int, nargs="+", default=None,
                    help="Layers to analyse. Default: all. "
                         "Recommended: --layers 0 6 12 19 22")
