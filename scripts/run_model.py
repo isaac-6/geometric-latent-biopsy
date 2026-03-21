@@ -317,19 +317,20 @@ def main() -> None:
     ], log_dir, "03_evaluate")
 
     # ---- 6. Theta-phi plots ----
-    run_step([
-        sys.executable, "scripts/plot_theta_phi_full.py",
-        "--model", args.model,
-        "--normative-n",    str(args.normative_n),
-        "--harmful-n",      str(args.harmful_n),
-        "--benign-agg-n",   str(args.benign_agg_n),
-        "--normative-fit-n", str(norm_fit_n),
-        "--harmful-fit-n",   str(harm_fit_n),
-        "--layer", "19",
-        "--figures-dir", str(figures_dir),
-        "--strategy", args.strategy,
-        "--seed", str(args.seed),
-    ], log_dir, "04_theta_phi")
+    for plot_layer in args.plot_layers:
+        run_step([
+            sys.executable, "scripts/plot_theta_phi_full.py",
+            "--model", args.model,
+            "--normative-n",    str(args.normative_n),
+            "--harmful-n",      str(args.harmful_n),
+            "--benign-agg-n",   str(args.benign_agg_n),
+            "--normative-fit-n", str(norm_fit_n),
+            "--harmful-fit-n",   str(harm_fit_n),
+            "--layer", str(plot_layer),
+            "--figures-dir", str(figures_dir),
+            "--strategy", args.strategy,
+            "--seed", str(args.seed),
+        ], log_dir, f"04_theta_phi_layer{plot_layer}")
 
     # ---- 7. Write manifest ----
     manifest = {
@@ -347,6 +348,7 @@ def main() -> None:
         "harmful_n":           args.harmful_n,
         "benign_agg_n":        args.benign_agg_n,
         "strategy":            args.strategy,
+        "plot_layers":         args.plot_layers,
         "seed":                args.seed,
         "command":             " ".join(sys.argv),
     }
@@ -394,6 +396,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--stability-layers", type=int, nargs="+",
                    default=[0, 6, 12, 19, 22],
                    help="Layers for stability analysis.")
+    p.add_argument("--plot-layers",       type=int, nargs="+",
+                   default=[5, 12, 19],
+                   help="Layers for theta-phi projection plots. "
+                        "Default: 5 (optimal detection), 12 (mid), 19 (best viz).")
     # Strategy
     p.add_argument("--strategy", default="normative_ref",
                    choices=["normative_ref", "harmful_ref", "both"])

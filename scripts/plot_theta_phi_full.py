@@ -88,34 +88,59 @@ def load_prompts(path: str, n: int, seed: int) -> list[str]:
 # Geometry
 # ---------------------------------------------------------------------------
 
+def _perp(X: torch.Tensor, pc1_unit: torch.Tensor) -> torch.Tensor:
+    """Orthogonal rejection of X from pc1_unit: X_perp = X - (X·c)c."""
+    dot = (X * pc1_unit).sum(dim=-1, keepdim=True)
+    return X - dot * pc1_unit
+
+
+def fit_phi_basis(
+    X_fit: torch.Tensor,   # (N_fit, D) — normative TRAINING activations only
+    pc1:   torch.Tensor,   # (D,) — reference direction (unit vector)
+) -> "PCA":
+    """
+    Fit the 2D phi basis from the normative TRAINING set only.
+    This ensures phi is a one-shot coordinate: defined entirely from safe data,
+    applicable to any unseen prompt without re-fitting.
+
+    Returns a fitted sklearn PCA(n_components=2) object.
+    """
+    pc1_unit = pc1 / pc1.norm()
+    X_fit_perp = _perp(X_fit, pc1_unit)
+    phi_pca = PCA(n_components=2)
+    phi_pca.fit(X_fit_perp.cpu().float().numpy())
+    return phi_pca
+
+
 def compute_theta_phi(
-    X_all: torch.Tensor,      # (N_total, D) — all points to project
-    pc1:   torch.Tensor,      # (D,) — reference direction (unit vector)
+    X_all:    torch.Tensor,  # (N_total, D) — all points to project
+    pc1:      torch.Tensor,  # (D,) — reference direction (unit vector)
+    phi_pca:  "PCA",         # fitted PCA from fit_phi_basis (normative train only)
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Project all points onto the (θ, φ) coordinate system defined by pc1.
+    Project all points onto the (θ, φ) coordinate system.
+
+    θ is measured from the reference direction pc1.
+    φ is the azimuthal angle in the 2D plane defined by phi_pca,
+    which was fit on the normative training set only — making both
+    coordinates fully one-shot (no test data used to define the basis).
 
     Returns
     -------
     theta : (N_total,) float array — angle from pc1 in [0, π]
-    phi   : (N_total,) float array — azimuthal angle in orthogonal plane [-π, π]
+    phi   : (N_total,) float array — azimuthal angle in the normative
+            orthogonal plane [-π, π]
     """
-    # Ensure pc1 is a unit vector
     pc1_unit = pc1 / pc1.norm()
-    ref = pc1_unit.unsqueeze(0)  # (1, D)
+    ref      = pc1_unit.unsqueeze(0)
 
     # θ: angle between each activation and the reference direction
     theta = compute_theta_core(X_all, ref.expand(X_all.shape[0], -1))  # (N,)
 
-    # Orthogonal rejection: X_perp = X - (X·c)c
-    dot = (X_all * pc1_unit).sum(dim=-1, keepdim=True)  # (N, 1)
-    X_perp = X_all - dot * pc1_unit                      # (N, D)
-
-    # 2D PCA in the orthogonal subspace to define the φ plane
-    pca = PCA(n_components=2)
-    X_perp_2d = pca.fit_transform(X_perp.cpu().float().numpy())  # (N, 2)
-
-    phi = np.arctan2(X_perp_2d[:, 1], X_perp_2d[:, 0])  # (N,)
+    # φ: project orthogonal components onto the pre-fit normative PCA basis
+    X_all_perp = _perp(X_all, pc1_unit)                                # (N, D)
+    X_perp_2d  = phi_pca.transform(X_all_perp.cpu().float().numpy())   # (N, 2)
+    phi        = np.arctan2(X_perp_2d[:, 1], X_perp_2d[:, 0])         # (N,)
 
     return theta.cpu().numpy(), phi
 
@@ -174,13 +199,16 @@ def main() -> None:
         pc1_vec = torch.tensor(pca_ref.components_[0],
                                dtype=X_fit.dtype, device=X_fit.device)
 
-        # Shared phi plane across all categories
+        # Fit phi basis on the FIT set only (one-shot: no test data used)
+        phi_pca = fit_phi_basis(X_fit, pc1_vec)
+
+        # Apply to all categories using the fixed fit-set basis
         parts = [X_norm_train, X_norm_test, X_harm_train, X_harm_test, X_benign]
         sizes = [x.shape[0] for x in parts]
         X_all = torch.cat(parts, dim=0)
 
-        print("Computing theta-phi coordinates...")
-        theta_all, phi_all = compute_theta_phi(X_all, pc1_vec)
+        print("Computing theta-phi coordinates (phi basis from fit set only)...")
+        theta_all, phi_all = compute_theta_phi(X_all, pc1_vec, phi_pca)
 
         idx = np.cumsum([0] + sizes)
         cat_names = ["norm_train", "norm_test", "harm_train", "harm_test", "benign"]

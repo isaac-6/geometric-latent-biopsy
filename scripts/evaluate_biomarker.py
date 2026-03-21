@@ -373,6 +373,106 @@ def baseline_random(split: DataSplit, layer: int, seed: int) -> dict[str, np.nda
     }
 
 
+
+def baseline_raw_theta(split: DataSplit, layer: int) -> dict[str, np.ndarray]:
+    """
+    Raw |theta - mu_norm| baseline — no GMM normalization.
+    For K=1 Gaussian, AUROC is identical to the GMM scorer since both are
+    monotonic in the same direction.  Included to verify this equivalence
+    and as a simpler deployable alternative (no density model needed).
+    """
+    from sklearn.decomposition import PCA as _PCA
+
+    X_fit = split.norm_fit[:, layer, :]
+    pca   = _PCA(n_components=1)
+    pca.fit(X_fit.cpu().float().numpy())
+    pc1   = torch.tensor(pca.components_[0], dtype=X_fit.dtype, device=X_fit.device)
+    pc1   = pc1 / torch.linalg.norm(pc1)
+    ref   = pc1.unsqueeze(0)
+
+    mu_norm = float(
+        compute_theta_core(X_fit, ref.expand(X_fit.shape[0], -1)).mean()
+    )
+
+    def _score(acts: torch.Tensor) -> np.ndarray:
+        X = acts[:, layer, :]
+        raw = compute_theta_core(X, ref.expand(X.shape[0], -1))
+        return np.abs(raw.cpu().numpy() - mu_norm)
+
+    return {
+        "norm":   _score(split.norm_eval),
+        "harm":   _score(split.harm_eval),
+        "benign": _score(split.benign),
+        "rest":   np.concatenate([_score(split.norm_eval), _score(split.benign)]),
+    }
+
+
+def baseline_bivariate_theta_phi(split: DataSplit, layer: int) -> dict[str, np.ndarray]:
+    """
+    Bivariate (theta, phi) anomaly score using a 2D Gaussian fit on the
+    normative training set.  phi basis is fit from normative training data only
+    (one-shot): no test or harmful data is used to define any coordinate.
+
+    Score = -log N_2D((theta, phi) | mu_2D, Sigma_2D).
+    Captures anomaly in both the radial (theta) and azimuthal (phi) directions.
+    """
+    from sklearn.decomposition import PCA as _PCA
+    X_fit = split.norm_fit[:, layer, :]
+
+    # Step 1: PC1 from normative training set
+    pca1 = _PCA(n_components=1)
+    pca1.fit(X_fit.cpu().float().numpy())
+    pc1  = torch.tensor(pca1.components_[0], dtype=X_fit.dtype, device=X_fit.device)
+    pc1  = pc1 / torch.linalg.norm(pc1)
+    ref  = pc1.unsqueeze(0)
+
+    # Step 2: theta for training set
+    theta_fit = compute_theta_core(
+        X_fit, ref.expand(X_fit.shape[0], -1)
+    ).cpu().numpy()
+
+    # Step 3: phi basis from training set orthogonal complements only
+    dot_fit    = (X_fit * pc1).sum(dim=-1, keepdim=True)
+    X_fit_perp = X_fit - dot_fit * pc1
+    pca2       = _PCA(n_components=2)
+    pca2.fit(X_fit_perp.cpu().float().numpy())
+    fit_2d     = pca2.transform(X_fit_perp.cpu().float().numpy())
+    phi_fit    = np.arctan2(fit_2d[:, 1], fit_2d[:, 0])
+
+    # Step 4: fit bivariate Gaussian on (theta, phi) of training set.
+    # We pre-compute mu and the Cholesky factor of the covariance, then
+    # evaluate logpdf manually to avoid Pylance/scipy stub type errors with
+    # the multivariate_normal frozen-distribution constructor.
+    coords_fit = np.column_stack([theta_fit, phi_fit])
+    mu_2d      = coords_fit.mean(axis=0)                       # (2,)
+    cov_2d     = np.cov(coords_fit.T) + 1e-6 * np.eye(2)      # (2,2)
+    cov_inv    = np.linalg.inv(cov_2d)
+    log_det    = np.log(np.linalg.det(cov_2d))
+    _LOG2PI    = np.log(2.0 * np.pi)
+
+    def _mvn_neg_logpdf(coords: np.ndarray) -> np.ndarray:
+        """−log N(x; mu_2d, cov_2d) — higher = more anomalous."""
+        diff = coords - mu_2d                                  # (N, 2)
+        maha = np.einsum("ni,ij,nj->n", diff, cov_inv, diff)  # (N,)
+        return 0.5 * (maha + log_det + 2.0 * _LOG2PI)
+
+    def _score(acts: torch.Tensor) -> np.ndarray:
+        X     = acts[:, layer, :]
+        theta = compute_theta_core(X, ref.expand(X.shape[0], -1)).cpu().numpy()
+        dot   = (X * pc1).sum(dim=-1, keepdim=True)
+        X_perp= X - dot * pc1
+        perp_2d = pca2.transform(X_perp.cpu().float().numpy())
+        phi   = np.arctan2(perp_2d[:, 1], perp_2d[:, 0])
+        return _mvn_neg_logpdf(np.column_stack([theta, phi]))
+
+    return {
+        "norm":   _score(split.norm_eval),
+        "harm":   _score(split.harm_eval),
+        "benign": _score(split.benign),
+        "rest":   np.concatenate([_score(split.norm_eval), _score(split.benign)]),
+    }
+
+
 # ===========================================================================
 # Metric utilities
 # ===========================================================================
@@ -471,13 +571,15 @@ def full_row(
 # ===========================================================================
 
 def plot_per_layer_auroc(
-    layers:           list[int],
-    auroc_harm_by_K:  dict[int, list[float]],
+    layers:            list[int],
+    auroc_harm_by_K:   dict[int, list[float]],
     auroc_benign_by_K: dict[int, list[float]],
-    auroc_cos:        list[float],
-    auroc_l2:         list[float],
-    strategy:         str,
-    out_dir:          Path,
+    auroc_cos:         list[float],
+    auroc_l2:          list[float],
+    strategy:          str,
+    out_dir:           Path,
+    auroc_raw_theta:   list[float] | None = None,
+    auroc_bivariate:   list[float] | None = None,
 ) -> None:
     K_values = sorted(auroc_harm_by_K.keys())
     colors   = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
@@ -494,6 +596,12 @@ def plot_per_layer_auroc(
                 label="Cosine baseline")
         ax.plot(layers, auroc_l2, "--", color="brown", alpha=0.7,
                 label="L2-norm baseline")
+        if auroc_raw_theta is not None:
+            ax.plot(layers, auroc_raw_theta, "-.", color="teal", alpha=0.8,
+                    label="|theta - mu| baseline")
+        if auroc_bivariate is not None:
+            ax.plot(layers, auroc_bivariate, "-.", color="olive", alpha=0.8,
+                    label="Bivariate (theta,phi) baseline")
         ax.axhline(0.5, color="gray", linestyle=":", label="Random (0.5)")
         ax.set_xlabel("Layer")
         ax.set_ylabel("AUROC (eval sets only)")
@@ -693,6 +801,8 @@ def run_strategy(
     list[float],              # auroc_cos
     list[float],              # auroc_l2
     list[float],              # auroc_rand
+    list[float],              # auroc_raw_theta
+    list[float],              # auroc_bivariate
 ]:
     """
     Run per-layer AUROC ablation for one strategy.
@@ -725,8 +835,12 @@ def run_strategy(
                           baseline_l2(split, l)["harm"])      for l in layers]
     auroc_rand = [_auroc(baseline_random(split, l, seed)["norm"],
                           baseline_random(split, l, seed)["harm"]) for l in layers]
+    auroc_raw_th = [_auroc(baseline_raw_theta(split, l)["norm"],
+                           baseline_raw_theta(split, l)["harm"]) for l in layers]
+    auroc_biv    = [_auroc(baseline_bivariate_theta_phi(split, l)["norm"],
+                           baseline_bivariate_theta_phi(split, l)["harm"]) for l in layers]
 
-    return auroc_harm_by_K, auroc_benign_by_K, auroc_cos, auroc_l2, auroc_rand
+    return auroc_harm_by_K, auroc_benign_by_K, auroc_cos, auroc_l2, auroc_rand, auroc_raw_th, auroc_biv
 
 
 def main() -> None:
@@ -801,13 +915,15 @@ def main() -> None:
         # ------------------------------------------------------------------
         print(f"\n[Exp 1 / {strategy}] Per-layer AUROC across K directions...")
         (auroc_harm_by_K, auroc_benign_by_K,
-         auroc_cos, auroc_l2, _) = run_strategy(
+         auroc_cos, auroc_l2, _, auroc_raw_th, auroc_biv) = run_strategy(
             strategy, split, layers, K_values, args.seed
         )
 
         plot_per_layer_auroc(
             layers, auroc_harm_by_K, auroc_benign_by_K,
             auroc_cos, auroc_l2, strategy, out_dir,
+            auroc_raw_theta=auroc_raw_th,
+            auroc_bivariate=auroc_biv,
         )
 
         # ------------------------------------------------------------------
