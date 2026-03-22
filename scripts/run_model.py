@@ -29,7 +29,7 @@ Usage
         --benign-agg-n 250 \\
         --seed 42 \\
         --stability-layers 0 6 12 19 22 \\
-        --eval-layers all \\
+        --plot-layers 5 12 19 \\
         --strategy both \\
         --auroc-plateau-tol 0.01 \\
         --min-fit-n 50 \\
