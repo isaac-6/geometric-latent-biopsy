@@ -104,9 +104,12 @@ class DataSplit:
     Invariants enforced by construction:
       - norm_fit  ∩ norm_eval  = ∅
       - harm_fit  ∩ harm_eval  = ∅
+      - harm_all  = harm_fit ∪ harm_eval  (all harmful prompts)
       - benign is never in any fit set
-      - Metric code only receives *_eval tensors; fit tensors are passed
-        only to biomarker.fit().
+      - normative_ref uses harm_all for evaluation (no harmful data withheld)
+      - harmful_ref  uses harm_eval for evaluation (harm_fit used for fitting)
+      - Metric code only receives *_eval / *_all tensors; fit tensors are
+        passed only to biomarker.fit().
     """
     # Fit tensors — passed to biomarker.fit() only
     norm_fit:  torch.Tensor    # (n_norm_fit, L, D)
@@ -114,7 +117,8 @@ class DataSplit:
 
     # Eval tensors — passed to biomarker.score_batch() only
     norm_eval: torch.Tensor    # (n_norm_eval, L, D)
-    harm_eval: torch.Tensor    # (n_harm_eval, L, D)
+    harm_eval: torch.Tensor    # (n_harm_eval, L, D)  — harm minus harm_fit (for harmful_ref)
+    harm_all:  torch.Tensor    # (n_harm_total, L, D) — ALL harmful (for normative_ref)
     benign:    torch.Tensor    # (n_benign,    L, D)  — always eval-only
 
     # Provenance (for logging and paper)
@@ -128,7 +132,8 @@ class DataSplit:
         return (
             f"DataSplit("
             f"norm={len(self.norm_fit)}fit/{len(self.norm_eval)}eval, "
-            f"harm={len(self.harm_fit)}fit/{len(self.harm_eval)}eval, "
+            f"harm={len(self.harm_fit)}fit/{len(self.harm_eval)}eval"
+            f"/{len(self.harm_all)}all, "
             f"benign={len(self.benign)}eval-only, "
             f"train_fraction={self.train_fraction}, seed={self.seed})"
         )
@@ -174,6 +179,7 @@ def make_split(
     return DataSplit(
         norm_fit=norm_fit, norm_eval=norm_eval,
         harm_fit=harm_fit, harm_eval=harm_eval,
+        harm_all=harm_acts,   # all harmful prompts — used by normative_ref
         benign=benign_acts,
         train_fraction=train_fraction,
         seed=seed,
@@ -207,7 +213,7 @@ def scores_normative_ref(
     )
     bm.fit(split.norm_fit)
     s_norm   = bm.score_batch(split.norm_eval)
-    s_harm   = bm.score_batch(split.harm_eval)
+    s_harm   = bm.score_batch(split.harm_all)   # ALL harmful — none withheld for normative_ref
     s_benign = bm.score_batch(split.benign)
     return {
         "norm":   s_norm,
@@ -337,7 +343,7 @@ def baseline_cosine(split: DataSplit, layer: int) -> dict[str, np.ndarray]:
         return (1.0 - cos).cpu().numpy()
     return {
         "norm":   _score(split.norm_eval),
-        "harm":   _score(split.harm_eval),
+        "harm":   _score(split.harm_all),   # all harmful for normative_ref convention
         "benign": _score(split.benign),
     }
 
@@ -348,7 +354,7 @@ def baseline_l2(split: DataSplit, layer: int) -> dict[str, np.ndarray]:
         return torch.linalg.norm(acts[:, layer, :], dim=-1).cpu().numpy()
     return {
         "norm":   _score(split.norm_eval),
-        "harm":   _score(split.harm_eval),
+        "harm":   _score(split.harm_all),   # all harmful for normative_ref convention
         "benign": _score(split.benign),
     }
 
@@ -368,7 +374,7 @@ def baseline_random(split: DataSplit, layer: int, seed: int) -> dict[str, np.nda
 
     return {
         "norm":   _score(split.norm_eval),
-        "harm":   _score(split.harm_eval),
+        "harm":   _score(split.harm_all),   # all harmful for normative_ref convention
         "benign": _score(split.benign),
     }
 
@@ -401,7 +407,7 @@ def baseline_raw_theta(split: DataSplit, layer: int) -> dict[str, np.ndarray]:
 
     return {
         "norm":   _score(split.norm_eval),
-        "harm":   _score(split.harm_eval),
+        "harm":   _score(split.harm_all),   # all harmful for normative_ref convention
         "benign": _score(split.benign),
         "rest":   np.concatenate([_score(split.norm_eval), _score(split.benign)]),
     }
@@ -467,7 +473,7 @@ def baseline_bivariate_theta_phi(split: DataSplit, layer: int) -> dict[str, np.n
 
     return {
         "norm":   _score(split.norm_eval),
-        "harm":   _score(split.harm_eval),
+        "harm":   _score(split.harm_all),   # all harmful for normative_ref convention
         "benign": _score(split.benign),
         "rest":   np.concatenate([_score(split.norm_eval), _score(split.benign)]),
     }
