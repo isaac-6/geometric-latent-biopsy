@@ -979,11 +979,24 @@ def main() -> None:
         # Theta statistics per category
         print("\n  Theta (raw) statistics per eval category:")
         print(f"  {'Category':<14}  {'mean':>6}  {'median':>6}  {'std':>6}  n")
-        for cat, label in [("norm", "norm_eval"), ("harm", "harm_eval"),
+        for cat, label in [("norm", "norm_eval"), ("harm", "harm_all" if strategy == "normative_ref" else "harm_eval"),
                             ("benign", "benign")]:
-            t = np.abs(sc[cat])   # abs: negated scores for harmful_ref
+            key = "harm" if cat == "harm" else cat
+            t = np.abs(sc[key])   # abs: negated scores for harmful_ref
             print(f"  {label:<14}  {t.mean():>6.3f}  "
                   f"{np.median(t):>6.3f}  {t.std():>6.3f}  {len(t)}")
+
+        # K-ablation summary: max K=1 AUROC vs best K>1 at the same layer
+        k1_best = float(max(auroc_harm_by_K[1]))
+        k1_best_layer = int(np.argmax(auroc_harm_by_K[1]))
+        other_K_at_same = [auroc_harm_by_K[K][k1_best_layer]
+                           for K in K_values if K > 1]
+        max_other = max(other_K_at_same) if other_K_at_same else float("nan")
+        cosine_at_best = auroc_cos[k1_best_layer]
+        print(f"\n  K-ablation at best K=1 layer ({k1_best_layer}):")
+        print(f"    K=1 AUROC:             {k1_best:.4f}")
+        print(f"    Best K>1 AUROC:        {max_other:.4f}  (delta={max_other-k1_best:+.4f})")
+        print(f"    Cosine baseline AUROC: {cosine_at_best:.4f}  (delta={cosine_at_best-k1_best:+.4f})")
 
         # Statistical tests
         # Statistical tests — use per-strategy comparison config
