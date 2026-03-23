@@ -1,3 +1,7 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+
 # LatentBiopsy: Geometric Anomaly Detection in LLM Residual Streams
 
 A **training-free** method for detecting harmful prompts by analysing the geometry of residual-stream activations.
@@ -87,7 +91,7 @@ geometric-latent-biopsy/
 ```bash
 git clone https://github.com/isaac-6/geometric-latent-biopsy.git
 cd geometric-latent-biopsy
-pip install -r requirements.txt
+pip install -e .
 ```
 
 ### 2. Download datasets
