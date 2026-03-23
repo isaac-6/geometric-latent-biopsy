@@ -199,7 +199,7 @@ python scripts/run_model.py --model Qwen/Qwen3.5-0.8B-Base --strategy normative_
 ```bibtex
 @misc{llorente2025latentbiopsy,
   title        = {Geometric Anomaly Detection in {LLM} Residual Streams:
-                  A Training-Free Safety Biomarker via Angular Decomposition},
+                  A Training-Free Safety Biomarker via Angular Deviation},
   author       = {Llorente-Saguer, Isaac},
   howpublished = {arXiv preprint arXiv:PLACEHOLDER},
   year         = {2025},
