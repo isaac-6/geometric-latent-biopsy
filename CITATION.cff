@@ -3,8 +3,9 @@ title: "Geometric Latent Biopsy: Zero-Shot Anomaly Detection in LLM Residual Str
 message: "If you use this software, please cite it as below."
 type: software
 authors:
-  - alias: isaac-6
-    affiliation: ""
+  - family-names: "Llorente-Saguer"
+    given-names: "Isaac"
+    orcid: "https://orcid.org/0000-0002-7612-5331"
 repository-code: "https://github.com/isaac-6/geometric-latent-biopsy"
 license: MIT
 version: "1.0.0"
