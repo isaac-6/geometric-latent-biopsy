@@ -139,8 +139,8 @@ def main():
     plt.gca().set_aspect('equal', adjustable='box')
     
     plt.title(f"Theta-Phi Orthogonal Projection Plane (Layer {TARGET_LAYER})\nRadius = Theta (angular dev), Angle = Phi (PCA variance)")
-    plt.xlabel("Orthogonal PC 1")
-    plt.ylabel("Orthogonal PC 2")
+    plt.xlabel("θ × cos(φ)")
+    plt.ylabel("θ × sin(φ)")
     plt.legend(loc='upper right')
     plt.grid(False)
     

@@ -780,7 +780,7 @@ def plot_precision_recall(
     ax.set_ylabel("Precision")
     ax.set_title(f"Precision-Recall Curves — Layer {best_layer}, K={best_K}\n"
                  f"Strategy: {strategy}  (dotted lines = chance precision)")
-    ax.legend(fontsize=9, loc="upper right")
+    ax.legend(fontsize=9, loc="lower right")
     ax.set_xlim(0.0, 1.02)
     ax.set_ylim(0.0, 1.05)
     ax.grid(True, alpha=0.3)

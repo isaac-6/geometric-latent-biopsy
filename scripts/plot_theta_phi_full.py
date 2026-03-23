@@ -202,8 +202,20 @@ def main() -> None:
         # Fit phi basis on the FIT set only (one-shot: no test data used)
         phi_pca = fit_phi_basis(X_fit, pc1_vec)
 
-        # Apply to all categories using the fixed fit-set basis
-        parts = [X_norm_train, X_norm_test, X_harm_train, X_harm_test, X_benign]
+        # For normative_ref, ALL harmful prompts are evaluation data —
+        # none were used for fitting, so the train/test split carries no
+        # meaning for this strategy.  Merge into a single "harm" category
+        # so the legend truthfully reflects the experimental design.
+        # For harmful_ref, keep the split to show PC1 generalises to held-out
+        # harmful examples.
+        if strategy == "normative_ref":
+            X_harm_all = torch.cat([X_harm_train, X_harm_test], dim=0)
+            parts    = [X_norm_train, X_norm_test, X_harm_all, X_benign]
+            cat_names = ["norm_train", "norm_test", "harm", "benign"]
+        else:
+            parts    = [X_norm_train, X_norm_test, X_harm_train, X_harm_test, X_benign]
+            cat_names = ["norm_train", "norm_test", "harm_train", "harm_test", "benign"]
+
         sizes = [x.shape[0] for x in parts]
         X_all = torch.cat(parts, dim=0)
 
@@ -211,7 +223,6 @@ def main() -> None:
         theta_all, phi_all = compute_theta_phi(X_all, pc1_vec, phi_pca)
 
         idx = np.cumsum([0] + sizes)
-        cat_names = ["norm_train", "norm_test", "harm_train", "harm_test", "benign"]
         theta_by_cat = {n: theta_all[idx[i]:idx[i+1]] for i, n in enumerate(cat_names)}
         phi_by_cat   = {n: phi_all[idx[i]:idx[i+1]]   for i, n in enumerate(cat_names)}
 
@@ -227,10 +238,11 @@ def _plot(
     args:        argparse.Namespace,
 ) -> None:
     """
-    Render the theta-phi plane.  Each point is at (theta*cos(phi), theta*sin(phi)).
-    Shows normative train/test, harmful train/test, and benign-agg.
-    Harmful train points are filled; harmful test are outlined to verify
-    the PC1 direction generalises to held-out harmful examples.
+    Render the theta-phi plane.  Each point is at (θ·cos φ, θ·sin φ).
+
+    For normative_ref: all harmful prompts shown as a single class (none used
+    for fitting).  For harmful_ref: harmful split into train/test to verify
+    that the PC1 direction generalises to held-out harmful examples.
     """
     fig, ax = plt.subplots(figsize=(10, 10))
 
@@ -238,49 +250,78 @@ def _plot(
         t, p = theta[cat], phi[cat]
         return t * np.cos(p), t * np.sin(p)
 
+    # ---- Normative (always shown as train / test split) ----
     px, py = cart("norm_train")
     ax.scatter(px, py, c="#1f77b4", s=50, alpha=0.5, marker="o",
-               label=f"Normative train (n={len(px)})")
+               label=f"Normative fit  (n={len(px)})")
     px, py = cart("norm_test")
     ax.scatter(px, py, c="#1f77b4", s=55, alpha=0.9, marker="o",
                edgecolors="white", linewidths=0.9,
-               label=f"Normative test (n={len(px)})")
+               label=f"Normative eval (n={len(px)})")
 
+    # ---- Benign-aggressive ----
     px, py = cart("benign")
     ax.scatter(px, py, c="#2ca02c", s=55, alpha=0.7, marker="^",
                label=f"Benign-agg / XSTest (n={len(px)})")
 
-    px, py = cart("harm_train")
-    ax.scatter(px, py, c="#d62728", s=60, alpha=0.5, marker="X",
-               label=f"Harmful train (n={len(px)})")
-    px, py = cart("harm_test")
-    ax.scatter(px, py, c="#d62728", s=70, alpha=0.9, marker="X",
-               edgecolors="white", linewidths=0.9,
-               label=f"Harmful test (n={len(px)})")
+    # ---- Harmful: single class for normative_ref, split for harmful_ref ----
+    if "harm" in theta:
+        # normative_ref: all 520 harmful prompts are eval data
+        px, py = cart("harm")
+        ax.scatter(px, py, c="#d62728", s=65, alpha=0.8, marker="X",
+                   label=f"Harmful / AdvBench (n={len(px)})")
+    else:
+        # harmful_ref: show fit vs held-out to verify generalisation
+        px, py = cart("harm_train")
+        ax.scatter(px, py, c="#d62728", s=60, alpha=0.4, marker="X",
+                   label=f"Harmful fit  (n={len(px)})")
+        px, py = cart("harm_test")
+        ax.scatter(px, py, c="#d62728", s=70, alpha=0.9, marker="X",
+                   edgecolors="white", linewidths=0.9,
+                   label=f"Harmful eval (n={len(px)})")
 
+    # ---- Reference direction marker ----
     ax.plot(0, 0, marker="*", markersize=18, color="black",
             zorder=10, label=ref_label)
 
-    max_theta = float(np.max(np.concatenate(list(theta.values()))))
+    # ---- Concentric theta circles — sparse labels at 50° to avoid overlap ----
+    all_theta = np.concatenate(list(theta.values()))
+    max_theta = float(np.max(all_theta))
+
+    # Draw a thin circle at every 0.25 rad; label only every 0.5 rad
+    label_angle_rad = np.radians(50)   # upper-right diagonal — away from data
+    cos_a, sin_a = np.cos(label_angle_rad), np.sin(label_angle_rad)
+
     for r in np.arange(0.25, max_theta + 0.25, 0.25):
         circle = mpatches.Circle((0, 0), r, color="gray", fill=False,
-                                  linestyle="--", alpha=0.35, linewidth=0.8)
+                                  linestyle="--", alpha=0.30, linewidth=0.7)
         ax.add_patch(circle)
-        ax.text(r + 0.01, 0.01, f"theta={r:.2f}", color="gray", fontsize=7,
-                va="bottom")
+        # Only label multiples of 0.5
+        if abs(round(r * 2) - r * 2) < 1e-9:   # r is a multiple of 0.5
+            ax.text(r * cos_a + 0.03, r * sin_a + 0.03,
+                    f"θ = {r:.1f}",
+                    color="gray", fontsize=8, ha="left", va="bottom",
+                    bbox=dict(facecolor="white", edgecolor="none",
+                              alpha=0.6, pad=0.5))
 
+    # ---- Axes and formatting ----
     ax.axhline(0, color="black", linewidth=0.4, alpha=0.25)
     ax.axvline(0, color="black", linewidth=0.4, alpha=0.25)
     lim = max_theta * 1.12
-    ax.set_xlim(-lim, lim);  ax.set_ylim(-lim, lim)
+    ax.set_xlim(-lim, lim)
+    ax.set_ylim(-lim, lim)
     ax.set_aspect("equal", adjustable="box")
+
     ax.set_title(
         f"Theta-Phi Projection — Layer {layer}  [{strategy}]\n"
         f"Reference: {ref_label}  |  Alpaca / AdvBench / XSTest",
         fontsize=13,
     )
-    ax.set_xlabel("theta * cos(phi)  (Orthogonal PC 1)", fontsize=11)
-    ax.set_ylabel("theta * sin(phi)  (Orthogonal PC 2)", fontsize=11)
+    # Axis labels: θ cos φ and θ sin φ are the correct Cartesian coordinates
+    # of the polar representation (θ = angular deviation, φ = azimuthal angle
+    # in the 2D orthogonal complement of the reference direction).
+    ax.set_xlabel(r"$\theta \cos \varphi$", fontsize=13)
+    ax.set_ylabel(r"$\theta \sin \varphi$", fontsize=13)
     ax.legend(loc="upper right", fontsize=9, framealpha=0.9)
 
     out = str(figures_dir / f"theta_phi_{strategy}_layer{layer}.png")
@@ -288,6 +329,7 @@ def _plot(
     plt.close()
     print(f"Saved -> {out}")
 
+    # ---- Summary statistics ----
     print(f"  {'Category':<14}  {'mean':>6}  {'median':>6}  {'std':>6}  n")
     for cat, t in theta.items():
         print(f"  {cat:<14}  {t.mean():>6.3f}  {float(np.median(t)):>6.3f}  "
