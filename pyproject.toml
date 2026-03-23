@@ -1,11 +1,11 @@
 [project]
 name = "latentbiopsy"
 version = "1.0.0"
-description = "Geometric anomaly detection in LLM residual streams — training-free harmful-prompt detection"
+description = "Geometric anomaly detection in LLM residual streams; training-free harmful-prompt detection"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [
-    { name = "Isaac Llorente-Saguer", email = "illorentes@gmail.com" }
+    { name = "Isaac Llorente-Saguer", email = "illorentes@proton.me" }
 ]
 requires-python = ">=3.10"
 keywords = [

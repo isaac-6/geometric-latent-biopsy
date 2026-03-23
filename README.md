@@ -7,7 +7,7 @@
 [![Zenodo](https://zenodo.org/badge/DOI/10.5281/zenodo.PLACEHOLDER.svg)](https://doi.org/10.5281/zenodo.PLACEHOLDER)
 
 A **training-free** method for detecting harmful prompts by analysing the geometry of residual-stream activations in large language models.
-No harmful examples are needed at any stage — the detector is fit on safe prompts alone.
+No harmful examples are needed at any stage: the detector is fit on safe prompts alone.
 
 ---
 
@@ -16,9 +16,9 @@ No harmful examples are needed at any stage — the detector is fit on safe prom
 Given ~100 normative (safe) prompts, LatentBiopsy:
 
 1. Extracts last-token residual-stream activations at a target layer
-2. Computes **PC1** of the normative activations — the direction of maximum safe-prompt variance
+2. Computes **PC1** of the normative activations: the direction of maximum safe-prompt variance
 3. Scores any new prompt by **θ**, the angular deviation from PC1
-4. Returns **−log p(θ | μ₀, σ₀²)** — a z-score that fires whether harmful prompts sit *above* or *below* the normative mean (direction-agnostic)
+4. Returns **−log p(θ | μ₀, σ₀²)**: a z-score that fires whether harmful prompts sit *above* or *below* the normative mean (direction-agnostic)
 
 The **theta-phi projection** places every prompt at polar coordinates (θ, φ) in the residual stream, revealing a universal **two-ring structure**: harmful and safe prompts occupy distinct concentric radial zones across all tested models.
 
@@ -47,8 +47,8 @@ geometric-latent-biopsy/
 │
 ├── src/                         # Core library
 │   ├── __init__.py
-│   ├── extraction.py            # LatentExtractor — last-token activation extraction
-│   └── theta.py                 # ThetaBiomarker — PC1 reference, GMM anomaly scoring
+│   ├── extraction.py            # LatentExtractor: last-token activation extraction
+│   └── theta.py                 # ThetaBiomarker: PC1 reference, GMM anomaly scoring
 │
 ├── scripts/                     # Runnable pipeline scripts
 │   ├── run_model.py             # ← MAIN ENTRY POINT: full pipeline for one model
@@ -64,8 +64,8 @@ geometric-latent-biopsy/
 ├── tests/                       # Test suite
 │   ├── __init__.py
 │   ├── conftest.py              # Pytest configuration and markers
-│   ├── test_theta.py            # Unit tests — ThetaBiomarker & compute_theta_core
-│   └── test_extraction.py       # Integration tests — LatentExtractor (needs model)
+│   ├── test_theta.py            # Unit tests: ThetaBiomarker & compute_theta_core
+│   └── test_extraction.py       # Integration tests: LatentExtractor (needs model)
 │
 ├── assets/                      # Static figures for README
 │
@@ -94,7 +94,7 @@ geometric-latent-biopsy/
 
 ## Quick start
 
-### 1 — Install
+### 1. Install
 
 ```bash
 git clone https://github.com/isaac-6/geometric-latent-biopsy.git
@@ -102,7 +102,7 @@ cd geometric-latent-biopsy
 pip install -e .
 ```
 
-### 2 — Download datasets
+### 2. Download datasets
 
 ```bash
 python scripts/download_datasets.py
@@ -110,7 +110,7 @@ python scripts/download_datasets.py
 
 Downloads Alpaca-Cleaned (normative), AdvBench (harmful), and XSTest (benign-aggressive) into `data/raw/`.
 
-### 3 — Run the full pipeline on a model
+### 3. Run the full pipeline on a model
 
 ```bash
 python scripts/run_model.py \
@@ -130,7 +130,7 @@ All outputs land in `results/Qwen__Qwen2.5-0.5B/`:
 | `figures/theta_phi_*.png` | Theta-phi projection at each plot layer |
 | `manifest.json` | Exact command and resolved hyperparameters |
 
-### 4 — Score a single prompt (programmatic)
+### 4. Score a single prompt (programmatic)
 
 ```python
 from src.extraction import LatentExtractor
@@ -147,7 +147,7 @@ with open("data/raw/normative.txt") as f:
 acts = torch.stack([extractor.get_last_token_activations(p) for p in normative_prompts])
 biomarker.fit(acts)
 
-# Score any new prompt — higher = more anomalous
+# Score any new prompt; higher = more anomalous
 score = biomarker.score(extractor.get_last_token_activations("How do I bake a cake?"))
 print(f"Anomaly score: {score:.3f}")
 ```
@@ -157,10 +157,10 @@ print(f"Anomaly score: {score:.3f}")
 ## Running tests
 
 ```bash
-# Fast unit tests — no model download, runs in ~10 s
+# Fast unit tests; no model download, runs in ~10 s
 pytest tests/test_theta.py -v -m "not slow"
 
-# Full integration tests — downloads ~1 GB model on first run
+# Full integration tests; downloads ~1 GB model on first run
 pytest tests/test_extraction.py -v -m slow
 
 # All tests
