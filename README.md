@@ -186,5 +186,4 @@ Tests cover core angle math (identical, opposite, orthogonal, zero vectors), zer
 This project is released under the [MIT License](LICENSE).
 
 ## Citation
-
 If you use this work in your research, please cite it — see [CITATION.cff](CITATION.cff) for details.

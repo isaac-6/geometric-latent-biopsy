@@ -1,0 +1,27 @@
+cff-version: 1.0.0
+title: "Geometric Latent Biopsy: Zero-Shot Anomaly Detection in LLM Residual Streams"
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - alias: isaac-6
+    affiliation: ""
+repository-code: "https://github.com/isaac-6/geometric-latent-biopsy"
+license: MIT
+version: "1.0.0"
+date-released: "2026-03-23"
+keywords:
+  - large-language-models
+  - anomaly-detection
+  - interpretability
+  - residual-stream
+  - safety
+  - geometric-methods
+  - PCA
+  - gaussian-mixture-model
+abstract: >-
+  A zero-shot geometric anomaly detector for LLM residual streams.
+  The method identifies harmful or anomalous prompts by measuring
+  angular deviations from a normative (safe) manifold in hidden
+  representations, using PCA-derived reference directions and
+  Gaussian Mixture Model scoring. No harmful examples are required
+  at fit time under the normative reference strategy.
