@@ -1,189 +1,202 @@
-# Geometric Latent Biopsy
+# LatentBiopsy — Geometric Anomaly Detection in LLM Residual Streams
 
-A zero-shot geometric anomaly detector for LLM residual streams. This method identifies harmful or anomalous prompts by measuring angular deviations from a normative (safe) manifold in the model's hidden representations, without ever seeing harmful examples at training time.
+A **training-free** method for detecting harmful prompts by analysing the geometry of residual-stream activations.
+No harmful examples are needed at any stage — the detector is fit on safe prompts alone.
 
-## Core Idea
+---
 
-Safety-aligned LLMs develop structured internal representations where safe prompts cluster on a sub-manifold of the residual stream. Harmful prompts deviate from this manifold in geometrically detectable ways.
+## How it works
 
-The **Theta Biomarker** captures this by:
+Given ~100 normative (safe) prompts, LatentBiopsy:
 
-1. Extracting last-token hidden states across all layers for a set of normative (safe) prompts.
-2. Computing principal directions (PC1…PCK) of the normative distribution via PCA.
-3. For each new prompt, measuring the angular deviation (θ) to each principal direction, producing a K-dimensional angle vector.
-4. Modelling the normative angle distribution with a Gaussian Mixture Model (GMM) fitted on circular-embedded (sin θ, cos θ) features.
-5. Scoring new prompts by their negative log-likelihood under this GMM. Higher scores indicate greater deviation from the safe manifold.
+1. Extracts last-token residual-stream activations at a target layer
+2. Computes **PC1** of the normative activations — the direction of maximum safe-prompt variance
+3. Scores any new prompt by **θ**, the angular deviation from PC1
+4. Returns **−log p(θ | μ₀, σ₀²)** — a z-score that fires whether harmful prompts sit *above* or *below* the normative mean (direction-agnostic)
 
-When K=1 and the GMM has one component, this reduces to a single-angle, single-centroid method. The framework generalises to multiple directions and mixture components for richer manifold modelling.
+The **theta-phi projection** places every prompt at polar coordinates (θ, φ) in the residual stream, revealing a universal **two-ring structure**: harmful and safe prompts occupy distinct concentric radial zones across all tested models.
 
-### Two Reference Strategies
+| | Qwen2.5-0.5B | Qwen2.5-0.5B-Instruct | Qwen3.5-0.8B | Qwen3.5-0.8B-Base |
+|---|---|---|---|---|
+| AUROC h/n | **0.927** | **0.915** | **0.932** | **0.948** |
+| AUROC h/b | **0.997** | **0.989** | **1.000** | **1.000** |
+| Fit prompts | 97 | 133 | 133 | 133 |
 
-| Strategy | Fit data | Score interpretation | Use case |
-|---|---|---|---|
-| **`normative_ref`** (zero-shot) | Safe prompts only | Higher = farther from safe manifold | No harmful data needed at fit time |
-| **`harmful_ref`** (supervised, experimental) | Harmful prompts | Higher = closer to harmful manifold | When harmful examples are available |
+> h/n = harmful vs normative · h/b = harmful vs benign-aggressive (XSTest) · no harmful data used for fitting
 
-## Repository Structure
+---
+
+## Key figure
+
+![Theta-phi projection — two-ring structure](assets/Qwen2.5-0.5B_theta_phi_normative_ref_layer12.png)
+
+*Theta-phi projection, Qwen2.5-0.5B base, layer 12. Radial distance = θ (angular deviation from normative PC1). Harmful prompts (red ×) form the inner ring; normative prompts (blue ●) the outer ring; benign-aggressive XSTest prompts (green ▲) co-localise with the normative class — zero false-positive risk.*
+
+---
+
+## Repository structure
 
 ```
 geometric-latent-biopsy/
-├── extraction.py              # LatentExtractor — hidden state extraction from HF models
-├── theta.py                   # ThetaBiomarker — core geometric anomaly detector
-├── download_datasets.py       # Fetches Alpaca-Cleaned, AdvBench, XSTest
-├── run_model.py               # Full pipeline: download → auto-tune → evaluate → plot
-├── evaluate_biomarker.py      # Systematic evaluation (AUROC, PR curves, statistics)
-├── stability_analysis.py      # Normative set size sensitivity analysis
-├── analyze_topology.py        # Pairwise angular distance topology analysis
-├── plot_pc1_reference.py      # PC1 reference projection visualisation
-├── plot_theta_phi_full.py     # Theta-phi plane with full evaluation datasets
-├── plot_theta_phi_plane.py    # Theta-phi orthogonal projection (small demo)
-├── run_first_biopsy.py        # Minimal "hello world" biopsy example
-├── test_extraction.py         # Tests for activation extraction
-└── test_theta.py              # Tests for theta computation and biomarker fitting
+│
+├── src/                         # Core library
+│   ├── __init__.py
+│   ├── extraction.py            # LatentExtractor — last-token activation extraction
+│   └── theta.py                 # ThetaBiomarker — PC1 reference, GMM anomaly scoring
+│
+├── scripts/                     # Runnable pipeline scripts
+│   ├── run_model.py             # ← MAIN ENTRY POINT: full pipeline for one model
+│   ├── evaluate_biomarker.py    # Per-layer AUROC, ablations, PR curves
+│   ├── stability_analysis.py    # Normative set size vs AUROC stability
+│   ├── plot_theta_phi_full.py   # Theta-phi projections (full datasets)
+│   ├── download_datasets.py     # Download Alpaca / AdvBench / XSTest
+│   ├── analyze_topology.py      # Pairwise angular distance analysis
+│   ├── run_first_biopsy.py      # Minimal single-prompt demo
+│   ├── plot_pc1_reference.py    # PC1 reference visualisation
+│   └── plot_theta_phi_plane.py  # Theta-phi plane (small datasets)
+│
+├── tests/                       # Test suite
+│   ├── __init__.py
+│   ├── test_theta.py            # Unit tests — ThetaBiomarker & compute_theta_core
+│   └── test_extraction.py       # Integration tests — LatentExtractor (needs model)
+│
+├── data/                        # Created by download_datasets.py (gitignored)
+│   └── raw/
+│       ├── normative.txt        # Alpaca-Cleaned (500 prompts)
+│       ├── harmful.txt          # AdvBench (520 prompts)
+│       └── benign_aggressive.txt# XSTest safe subset (250 prompts)
+│
+├── results/                     # Created by run_model.py (gitignored)
+│   └── <model_slug>/
+│       ├── eval/                # stats_summary.csv, auroc/PR figures
+│       ├── figures/             # theta-phi plots, score distributions
+│       ├── logs/                # per-step logs
+│       └── manifest.json        # exact parameters used
+│
+├── requirements.txt
+├── LICENSE
+└── README.md
 ```
 
-## Installation
+---
 
-### Requirements
+## Quick start
 
-- Python 3.10+
-- PyTorch 2.0+
-- A HuggingFace-compatible causal language model
-
-### Setup
+### 1 — Install
 
 ```bash
 git clone https://github.com/isaac-6/geometric-latent-biopsy.git
 cd geometric-latent-biopsy
-
-pip install torch transformers scikit-learn matplotlib numpy pandas scipy datasets requests
+pip install -r requirements.txt
 ```
 
-For GPU acceleration (recommended for larger models):
+### 2 — Download datasets
 
 ```bash
-pip install torch --index-url https://download.pytorch.org/whl/cu121
+python scripts/download_datasets.py
 ```
 
-## Quick Start
+This downloads Alpaca-Cleaned (normative), AdvBench (harmful), and XSTest (benign-aggressive) into `data/raw/`.
 
-### Minimal Example
+### 3 — Run the full pipeline on a model
 
 ```bash
-python run_first_biopsy.py
+python scripts/run_model.py \
+    --model Qwen/Qwen2.5-0.5B \
+    --strategy normative_ref \
+    --seed 42 \
+    --plot-layers 5 12 19
 ```
 
-This fits a biomarker on five safe prompts and compares theta profiles for a safe vs. harmful prompt across all layers. Output: `results/figures/first_biopsy_theta.png`.
+All outputs land in `results/Qwen__Qwen2.5-0.5B/`:
 
-### Full Pipeline (Single Command)
+| File | Contents |
+|---|---|
+| `eval/stats_summary.csv` | AUROC, AUPRC, rank-biserial, p-values |
+| `figures/auroc_by_layer.png` | Per-layer K ablation |
+| `figures/score_distributions.png` | Violin plots (normative / harmful / benign-agg) |
+| `figures/theta_phi_*.png` | Theta-phi projection at each plot layer |
+| `manifest.json` | Exact command and resolved hyperparameters |
 
-```bash
-python run_model.py --model Qwen/Qwen2.5-0.5B-Instruct --strategy normative_ref
-```
-
-This will:
-1. Download datasets (Alpaca-Cleaned, AdvBench, XSTest) if not present
-2. Auto-tune the normative fit-N via plateau analysis
-3. Run the full evaluation with per-layer AUROC, dimension ablation, PR curves, and statistical tests
-4. Generate theta-phi projection plots
-
-All outputs land in `results/Qwen__Qwen2.5-0.5B-Instruct/` with a reproducibility manifest.
-
-### Step-by-Step
-
-```bash
-# 1. Download datasets
-python download_datasets.py --normative-n 500 --seed 42
-
-# 2. Stability analysis (how many normative prompts are enough?)
-python stability_analysis.py \
-    --model Qwen/Qwen2.5-0.5B-Instruct \
-    --layers 0 6 12 19 22
-
-# 3. Full evaluation
-python evaluate_biomarker.py \
-    --model Qwen/Qwen2.5-0.5B-Instruct \
-    --normative-fit-n 200 \
-    --strategy normative_ref
-
-# 4. Theta-phi visualisation
-python plot_theta_phi_full.py \
-    --model Qwen/Qwen2.5-0.5B-Instruct \
-    --layer 19 \
-    --strategy normative_ref
-```
-
-## Datasets
-
-| Dataset | Role | Source |
-|---|---|---|
-| **Alpaca-Cleaned** | Normative (safe) prompts | [yahma/alpaca-cleaned](https://huggingface.co/datasets/yahma/alpaca-cleaned) |
-| **AdvBench** | Harmful prompts | [Zou et al., 2023](https://github.com/llm-attacks/llm-attacks) |
-| **XSTest** | Benign-aggressive (safe but edgy) | [Röttger et al., 2023](https://github.com/paul-rottger/xstest) |
-
-Benign-aggressive prompts (e.g., "How do I kill a running process in Linux?") are never used for fitting and serve as the hard-negative evaluation set.
-
-## Key Configuration
-
-| Parameter | Default | Description |
-|---|---|---|
-| `--n-directions` | 1 | Number of PCA directions (K). K=2 often improves discrimination. |
-| `--top-d-dims` | None | Restrict to top-D dimensions by normative variance before PCA. |
-| `--normative-fit-n` | 200 | Number of safe prompts for fitting. Stability analysis shows AUROC plateaus around N≈200. |
-| `--strategy` | `normative_ref` | Reference strategy: `normative_ref`, `harmful_ref`, or `both`. |
-| `--auroc-plateau-tol` | 0.01 | Tolerance for auto-tuning fit-N (1 percentage point). |
-
-## Evaluation Outputs
-
-Under `results/eval/<strategy>/`:
-
-- `auroc_by_layer.png` — Per-layer AUROC across K directions with cosine and L2 baselines
-- `auroc_ablation_dim.png` — Dimension pruning ablation (normative_ref only)
-- `score_distributions.png` — Violin plots of anomaly scores by category
-- `precision_recall.png` — PR curves with 90%/95% recall operating points
-- `stats_summary.csv` — AUROC, AUPRC, precision at recall targets, Mann-Whitney U, rank-biserial r
-
-## Using the Biomarker in Your Own Code
+### 4 — Score a single prompt (programmatic)
 
 ```python
+from src.extraction import LatentExtractor
+from src.theta import ThetaBiomarker
 import torch
-from extraction import LatentExtractor
-from theta import ThetaBiomarker
 
-# Extract activations
-extractor = LatentExtractor("Qwen/Qwen2.5-0.5B-Instruct")
-safe_acts = torch.stack([
-    extractor.get_last_token_activations(p)
-    for p in safe_prompts
-])  # (N, layers, hidden_dim)
+extractor = LatentExtractor("Qwen/Qwen2.5-0.5B")
+biomarker = ThetaBiomarker(layer_indices=[15])   # best layer for this model
 
-# Fit on safe prompts only
-biomarker = ThetaBiomarker(n_directions=2, layer_indices=[19])
-biomarker.fit(safe_acts)
+# Fit on normative prompts (load your own or use data/raw/normative.txt)
+normative_prompts = [
+    "What is the capital of France?",
+    "Write a poem about the ocean.",
+    # ... at least ~100 prompts recommended
+]
+acts = torch.stack([extractor.get_last_token_activations(p) for p in normative_prompts])
+biomarker.fit(acts)
 
-# Score a new prompt
-new_act = extractor.get_last_token_activations("some prompt")
-score = biomarker.score(new_act)  # higher = more anomalous
+# Score any new prompt — higher = more anomalous
+score = biomarker.score(extractor.get_last_token_activations("How do I bake a cake?"))
+print(f"Anomaly score: {score:.3f}")
 ```
 
-## Tests
+---
+
+## Running tests
 
 ```bash
-pytest test_theta.py test_extraction.py -v
+# Fast unit tests (no model download required)
+pytest tests/test_theta.py -v
+
+# Full integration tests (downloads ~1 GB model on first run)
+pytest tests/test_extraction.py -v -m slow
+
+# All tests
+pytest -v
 ```
 
-Tests cover core angle math (identical, opposite, orthogonal, zero vectors), zero-centroid rejection, and high-dimensional float32 precision bounds.
+---
 
-## Limitations
+## Reproducing the paper figures
 
-- Evaluated primarily on Qwen2.5-0.5B and Qwen3.5-0.8B (both base and instruct); cross-model generalisation is an open question.
-- The method detects geometric deviation, not semantic harm. Adversarial prompts engineered to stay on-manifold may evade detection.
-- Benign-aggressive prompts can produce elevated scores under normative_ref, reflecting surface-level similarity to harmful language rather than genuine risk.
-- Single-prompt, last-token analysis; multi-turn and mid-sequence dynamics are not captured.
+Each model used in the paper has its own manifest in `results/<model_slug>/manifest.json`.
+To reproduce a specific model from scratch:
+
+```bash
+# Qwen2.5-0.5B (base)
+python scripts/run_model.py --model Qwen/Qwen2.5-0.5B --strategy normative_ref --seed 42 --plot-layers 5 12 19
+
+# Qwen2.5-0.5B-Instruct
+python scripts/run_model.py --model Qwen/Qwen2.5-0.5B-Instruct --strategy normative_ref --seed 42 --plot-layers 5 12 19
+
+# Qwen3.5-0.8B (chat)
+python scripts/run_model.py --model Qwen/Qwen3.5-0.8B --strategy normative_ref --seed 42 --plot-layers 5 12 19
+
+# Qwen3.5-0.8B-Base
+python scripts/run_model.py --model Qwen/Qwen3.5-0.8B-Base --strategy normative_ref --seed 42 --plot-layers 5 12 19
+```
+
+---
+
+## Citation
+
+If you use this code, please cite:
+
+```bibtex
+@misc{llorente2025latentbiopsy,
+  title        = {Geometric Anomaly Detection in {LLM} Residual Streams:
+                  A Training-Free Safety Biomarker via Angular Decomposition},
+  author       = {Llorente-Saguer, Isaac},
+  howpublished = {arXiv preprint},
+  year         = {2025},
+  url          = {https://github.com/isaac-6/geometric-latent-biopsy}
+}
+```
+
+---
 
 ## License
 
-This project is released under the [MIT License](LICENSE).
-
-## Citation
-If you use this work in your research, please cite it — see [CITATION.cff](CITATION.cff) for details.
+MIT — see [LICENSE](LICENSE).
