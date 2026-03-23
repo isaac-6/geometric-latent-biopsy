@@ -57,7 +57,7 @@ geometric-latent-biopsy/
 │   ├── analyze_topology.py      # Pairwise angular distance analysis
 │   ├── run_first_biopsy.py      # Minimal single-prompt demo
 │   ├── plot_pc1_reference.py    # PC1 reference visualisation
-│   └── plot_theta_phi_plane.py  # Theta-phi plane (small datasets)
+│   └── plot_theta_phi_plane.py  # Theta-phi plane (small manual test)
 │
 ├── tests/                       # Test suite
 │   ├── __init__.py
@@ -77,7 +77,7 @@ geometric-latent-biopsy/
 │       ├── logs/                # per-step logs
 │       └── manifest.json        # exact parameters used
 │
-├── requirements.txt
+├── pyproject.toml
 ├── LICENSE
 └── README.md
 ```
