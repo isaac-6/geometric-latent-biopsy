@@ -1,7 +1,6 @@
 name: Tests
 
 on:
-  workflow_dispatch:
   push:
     paths:
       - 'src/**'
@@ -12,6 +11,10 @@ on:
       - 'src/**'
       - 'tests/**'
       - 'pyproject.toml'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   test:
