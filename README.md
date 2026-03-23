@@ -1,10 +1,11 @@
 # LatentBiopsy: Geometric Anomaly Detection in LLM Residual Streams
 
+[![Zenodo](https://zenodo.org/badge/DOI/10.5281/zenodo.19194903.svg)](https://doi.org/10.5281/zenodo.19194903)
+
 [![Tests](https://github.com/isaac-6/geometric-latent-biopsy/actions/workflows/tests.yml/badge.svg)](https://github.com/isaac-6/geometric-latent-biopsy/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![arXiv](https://img.shields.io/badge/arXiv-PLACEHOLDER-b31b1b.svg)](https://arxiv.org/abs/PLACEHOLDER)
-[![Zenodo](https://zenodo.org/badge/DOI/10.5281/zenodo.PLACEHOLDER.svg)](https://doi.org/10.5281/zenodo.PLACEHOLDER)
 
 A **training-free** method for detecting harmful prompts by analysing the geometry of residual-stream activations in large language models.
 No harmful examples are needed at any stage: the detector is fit on safe prompts alone.
