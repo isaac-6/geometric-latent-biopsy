@@ -146,6 +146,20 @@ class ThetaBiomarker:
         # Back-compat: store centroid for the first selected layer
         self.centroids = normative_activations[:, layers, :].mean(dim=0)  # (len(layers), D)
 
+        # Guard: reject degenerate data whose centroid has near-zero norm.
+        # A centroid norm at or near zero indicates perfectly anti-symmetric
+        # activations (e.g. rows that cancel to zero), which is unphysical
+        # for real LLM activations and would produce meaningless PC1 directions.
+        centroid_norms = torch.linalg.norm(self.centroids, dim=-1)  # (len(layers),)
+        if (centroid_norms < 1e-6).any():
+            bad = int((centroid_norms < 1e-6).nonzero(as_tuple=True)[0][0])
+            raise ValueError(
+                f"Normative activations at layer index {layers[bad]} have a "
+                f"near-zero norm centroid ({centroid_norms[bad].item():.2e}). "
+                "This indicates degenerate (e.g. perfectly anti-symmetric) input. "
+                "Provide at least one non-cancelling normative prompt."
+            )
+
         # ---- Per-layer: dimension pruning + PCA ----
         self._dim_indices = []
         self._pca_models  = []

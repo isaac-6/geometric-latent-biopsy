@@ -30,7 +30,7 @@ Usage
         --seed 42 \\
         --stability-layers 0 6 12 19 22 \\
         --plot-layers 5 12 19 \\
-        --strategy both \\
+        --strategy normative_ref \\
         --auroc-plateau-tol 0.01 \\
         --min-fit-n 50 \\
         --max-fit-n 400
@@ -289,7 +289,7 @@ def main() -> None:
     figures_dir = root / "figures"
     eval_dir.mkdir(exist_ok=True)
     figures_dir.mkdir(exist_ok=True)
-
+    
     run_step([
         sys.executable, "scripts/stability_analysis.py",
         "--model", args.model,
@@ -327,8 +327,8 @@ def main() -> None:
             "--normative-fit-n", str(norm_fit_n),
             "--harmful-fit-n",   str(harm_fit_n),
             "--layer", str(plot_layer),
-            "--figures-dir", str(figures_dir),
             "--strategy", args.strategy,
+            "--figures-dir", str(figures_dir),
             "--seed", str(args.seed),
         ], log_dir, f"04_theta_phi_layer{plot_layer}")
 
@@ -396,10 +396,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--stability-layers", type=int, nargs="+",
                    default=[0, 6, 12, 19, 22],
                    help="Layers for stability analysis.")
-    p.add_argument("--plot-layers",       type=int, nargs="+",
+    # Plot layers
+    p.add_argument("--plot-layers", type=int, nargs="+",
                    default=[5, 12, 19],
-                   help="Layers for theta-phi projection plots. "
-                        "Default: 5 (optimal detection), 12 (mid), 19 (best viz).")
+                   help="Layers for theta-phi projection plots (default: 5 12 19).")
     # Strategy
     p.add_argument("--strategy", default="normative_ref",
                    choices=["normative_ref", "harmful_ref", "both"])

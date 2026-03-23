@@ -1,26 +1,48 @@
-# Environments
-.env
-.biopsy
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
+# LatentBiopsy .gitignore
+
+# Generated data and results (can be large)
+data/
+results/
 
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
 
-# Data & Models
-data/
-results/
-*.safetensors
-*.bin
-*.pt
-*.pth
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+.biopsy/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# OS
+.DS_Store
+Thumbs.db
 
 # IDEs
-.vscode/
 .idea/
-.ipynb_checkpoints/
+.vscode/
+*.swp
+*.swo
+
+# HuggingFace model cache (if stored locally in repo)
+*.bin
+*.safetensors
+*.gguf
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/

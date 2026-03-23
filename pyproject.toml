@@ -1,0 +1,60 @@
+[project]
+name = "latentbiopsy"
+version = "1.0.0"
+description = "Geometric anomaly detection in LLM residual streams — training-free harmful-prompt detection"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Isaac Llorente-Saguer", email = "illorentes@gmail.com" }
+]
+requires-python = ">=3.10"
+keywords = [
+    "LLM safety", "anomaly detection", "mechanistic interpretability",
+    "harmful prompt detection", "residual stream", "principal component analysis"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "torch>=2.1.0",
+    "transformers>=4.40.0",
+    "accelerate>=0.28.0",
+    "numpy>=1.26.0",
+    "scikit-learn>=1.4.0",
+    "datasets>=2.18.0",
+    "requests>=2.31.0",
+    "pandas>=2.1.0",
+    "matplotlib>=3.8.0",
+    "scipy>=1.12.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0"]
+
+[project.urls]
+Repository = "https://github.com/isaac-6/geometric-latent-biopsy"
+Paper      = "..."   # soon to be updated after arXiv submission
+
+# ---------------------------------------------------------------------------
+# pytest configuration
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths    = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+markers = [
+    "slow: marks tests that load a HuggingFace model (~1 GB download on first run). Deselect with: pytest -m 'not slow'",
+]
+filterwarnings = [
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning:sklearn",
+]

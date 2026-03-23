@@ -28,7 +28,7 @@ class LatentExtractor:
         Runs a forward pass and extracts the hidden states of the final token for all layers.
         
         Returns:
-            torch.Tensor of shape (num_layers, hidden_dimension)
+            torch.Tensor of shape (num_layers, hidden_dimension) 
         """
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
         

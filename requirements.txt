@@ -1,11 +1,26 @@
-torch>=2.2.0
+# LatentBiopsy — Python dependencies
+# Tested with Python 3.10 and 3.12.
+# Install: pip install -r requirements.txt
+
+# Core ML
+torch>=2.1.0
 transformers>=4.40.0
-accelerate>=0.29.0
-numpy
-scikit-learn
-matplotlib
-datasets
-requests
-pandas
-pytest
-scipy
+accelerate>=0.28.0         # required for device_map in from_pretrained
+
+# Numeric / ML utilities
+numpy>=1.26.0
+scikit-learn>=1.4.0        # PCA, GaussianMixture, StandardScaler, roc_auc_score
+
+# Data acquisition
+datasets>=2.18.0           # Alpaca-Cleaned via HuggingFace Hub
+requests>=2.31.0           # AdvBench / XSTest CSV download
+pandas>=2.1.0              # CSV parsing
+
+# Visualisation
+matplotlib>=3.8.0
+
+# Statistics
+scipy>=1.12.0              # mannwhitneyu, precision_recall_curve
+
+# Testing
+pytest>=8.0.0
