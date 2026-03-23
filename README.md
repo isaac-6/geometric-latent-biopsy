@@ -1,4 +1,4 @@
-# LatentBiopsy — Geometric Anomaly Detection in LLM Residual Streams
+# LatentBiopsy: Geometric Anomaly Detection in LLM Residual Streams
 
 [![Tests](https://github.com/isaac-6/geometric-latent-biopsy/actions/workflows/tests.yml/badge.svg)](https://github.com/isaac-6/geometric-latent-biopsy/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
