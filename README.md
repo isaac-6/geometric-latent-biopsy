@@ -89,8 +89,11 @@ geometric-latent-biopsy/
 ### 1. Install
 
 ```bash
+# Clone the repository
 git clone https://github.com/isaac-6/geometric-latent-biopsy.git
 cd geometric-latent-biopsy
+
+# Install the package and its dependencies
 pip install -e .
 ```
 
