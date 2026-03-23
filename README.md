@@ -1,7 +1,7 @@
-# LatentBiopsy — Geometric Anomaly Detection in LLM Residual Streams
+# LatentBiopsy: Geometric Anomaly Detection in LLM Residual Streams
 
 A **training-free** method for detecting harmful prompts by analysing the geometry of residual-stream activations.
-No harmful examples are needed at any stage — the detector is fit on safe prompts alone.
+No harmful examples are needed at any stage: the detector is fit on a subset of safe prompts alone.
 
 ---
 
@@ -10,9 +10,9 @@ No harmful examples are needed at any stage — the detector is fit on safe prom
 Given ~100 normative (safe) prompts, LatentBiopsy:
 
 1. Extracts last-token residual-stream activations at a target layer
-2. Computes **PC1** of the normative activations — the direction of maximum safe-prompt variance
+2. Computes **PC1** of the normative activations: the direction of maximum safe-prompt variance
 3. Scores any new prompt by **θ**, the angular deviation from PC1
-4. Returns **−log p(θ | μ₀, σ₀²)** — a z-score that fires whether harmful prompts sit *above* or *below* the normative mean (direction-agnostic)
+4. Returns **−log p(θ | μ₀, σ₀²)**: a z-score that fires whether harmful prompts sit *above* or *below* the normative mean (direction-agnostic)
 
 The **theta-phi projection** places every prompt at polar coordinates (θ, φ) in the residual stream, revealing a universal **two-ring structure**: harmful and safe prompts occupy distinct concentric radial zones across all tested models.
 
@@ -82,7 +82,7 @@ geometric-latent-biopsy/
 
 ## Quick start
 
-### 1 — Install
+### 1. Install
 
 ```bash
 git clone https://github.com/isaac-6/geometric-latent-biopsy.git
@@ -90,7 +90,7 @@ cd geometric-latent-biopsy
 pip install -r requirements.txt
 ```
 
-### 2 — Download datasets
+### 2. Download datasets
 
 ```bash
 python scripts/download_datasets.py
@@ -98,7 +98,7 @@ python scripts/download_datasets.py
 
 This downloads Alpaca-Cleaned (normative), AdvBench (harmful), and XSTest (benign-aggressive) into `data/raw/`.
 
-### 3 — Run the full pipeline on a model
+### 3. Run the full pipeline on a model
 
 ```bash
 python scripts/run_model.py \
@@ -118,7 +118,7 @@ All outputs land in `results/Qwen__Qwen2.5-0.5B/`:
 | `figures/theta_phi_*.png` | Theta-phi projection at each plot layer |
 | `manifest.json` | Exact command and resolved hyperparameters |
 
-### 4 — Score a single prompt (programmatic)
+### 4. Score a single prompt (programmatic)
 
 ```python
 from src.extraction import LatentExtractor
@@ -189,7 +189,7 @@ If you use this code, please cite:
   title        = {Geometric Anomaly Detection in {LLM} Residual Streams:
                   A Training-Free Safety Biomarker via Angular Decomposition},
   author       = {Llorente-Saguer, Isaac},
-  howpublished = {arXiv preprint},
+  <!-- howpublished = {arXiv preprint soon}, -->
   year         = {2025},
   url          = {https://github.com/isaac-6/geometric-latent-biopsy}
 }
@@ -199,4 +199,4 @@ If you use this code, please cite:
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT (see [LICENSE](LICENSE)).
