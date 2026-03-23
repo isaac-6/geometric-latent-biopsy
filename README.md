@@ -41,13 +41,10 @@ The **theta-phi projection** places every prompt at polar coordinates (θ, φ) i
 ---
 
 ## Repository structure
-
-
-```html
 <details>
 <summary><b>(click to expand the repository structure)</b></summary>
 
-```text
+```
 geometric-latent-biopsy/
 │
 ├── src/                         # Core library
@@ -96,7 +93,6 @@ geometric-latent-biopsy/
 ```
 
 </details>
-```
 
 ---
 
