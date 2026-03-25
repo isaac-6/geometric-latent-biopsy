@@ -976,6 +976,11 @@ def main() -> None:
         plot_score_distributions(sc, best_layer, best_K, strategy, out_dir)
         plot_precision_recall(sc, best_layer, best_K, strategy, out_dir)
 
+        # Save best config for downstream scripts (like run_model.py)
+        import json
+        with open(out_dir / "best_config.json", "w") as f:
+            json.dump({"best_layer": best_layer, "best_K": best_K}, f)
+
         # Theta statistics per category
         print("\n  Theta (raw) statistics per eval category:")
         print(f"  {'Category':<14}  {'mean':>6}  {'median':>6}  {'std':>6}  n")

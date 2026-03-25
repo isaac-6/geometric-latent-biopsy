@@ -46,3 +46,6 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# experimental
+scripts/benchmark_inference.py

@@ -66,6 +66,18 @@ def _already_exists(path: str) -> bool:
         return True
     return False
 
+def _is_sufficient(path: str, expected_n: int) -> bool:
+    """Checks if the file exists and contains at least expected_n lines."""
+    if not os.path.exists(path):
+        return False
+    with open(path, "r", encoding="utf-8") as f:
+        n = sum(1 for _ in f)
+    if n < expected_n:
+        print(f"  [update] {path} has {n} prompts; requested {expected_n}. Re-generating...")
+        return False
+    print(f"  [skip] {path} already sufficient ({n} prompts).")
+    return True
+
 
 # ---------------------------------------------------------------------------
 # AdvBench — harmful behaviors
@@ -145,7 +157,8 @@ def download_xstest():
 
 def download_alpaca(n: int, seed: int):
     print(f"\n[3/3] Alpaca-Cleaned — normative set (n={n}, seed={seed})")
-    if _already_exists(NORMATIVE_OUT):
+    # if _already_exists(NORMATIVE_OUT):
+    if _is_sufficient(NORMATIVE_OUT, n):
         return
 
     try:
@@ -163,11 +176,18 @@ def download_alpaca(n: int, seed: int):
     all_instructions: list[str] = ds_dict["instruction"]
     all_inputs: list[str]       = ds_dict["input"]
 
-    filtered = [
-        instr
-        for instr, inp in zip(all_instructions, all_inputs)
-        if not str(inp).strip() and len(str(instr).strip()) >= 20
-    ]
+    filtered = []
+    for instr, inp in zip(all_instructions, all_inputs):
+        instr = str(instr).strip()
+        # Strict Quality Filter:
+        if (
+            not str(inp).strip() and           # 1. No separate 'input' context 
+            "\n" not in instr and              # 2. MUST be a single line (no math/lists)
+            not instr.endswith(":") and        # 3. No dangling colon prompts
+            len(instr) >= 20 and               # 4. Long enough to have real semantics
+            len(instr) <= 250                  # 5. Not so long it's a huge outlier
+        ):
+            filtered.append(instr)
 
     print(f"  After filtering: {len(filtered)} candidate instructions.")
 
@@ -187,9 +207,13 @@ def download_alpaca(n: int, seed: int):
 def parse_args():
     parser = argparse.ArgumentParser(description="Download benchmark datasets.")
     parser.add_argument(
-        "--normative-n", type=int, default=500,
-        help="Number of Alpaca prompts to sample for the normative set (default: 500)."
+        "--normative-n", type=int, default=720,
+        help="Number of Alpaca prompts to sample for the normative set (default: 720)."
     )
+    parser.add_argument("--harmful-n", type=int, default=520,
+                        help="Number of harmful prompts to use from AdvBench (default: 520).")      
+    parser.add_argument("--benign-agg-n", type=int, default=250,
+                        help="Number of benign-aggressive prompts to use (default: 250).")
     parser.add_argument(
         "--seed", type=int, default=42,
         help="Random seed for Alpaca sampling (default: 42)."

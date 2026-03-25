@@ -237,7 +237,16 @@ def main() -> None:
         return random.sample(lines, min(n, len(lines)))
 
     extractor = LatentExtractor(args.model)
-    tune_layer = args.stability_layers[len(args.stability_layers) // 2]  # middle layer
+    L = extractor.num_layers
+
+    # ---- Dynamic Layer Selection ----
+    # If no stability layers are provided, use 0%, 25%, 50%, 75%, 100%
+    if not args.stability_layers:
+        stability_layers =[0, L // 4, L // 2, 3 * L // 4, L - 1]
+    else:
+        stability_layers = args.stability_layers
+    
+    tune_layer = stability_layers[len(stability_layers) // 2]  # middle layer
 
     def extract(prompts: list[str]) -> torch.Tensor:
         return torch.stack([extractor.get_last_token_activations(p)
@@ -284,7 +293,7 @@ def main() -> None:
     del extractor  # free GPU memory before subprocess calls
 
     # ---- 4. Stability analysis ----
-    layers_str = [str(l) for l in args.stability_layers]
+    layers_str = [str(l) for l in stability_layers]
     eval_dir    = root / "eval"
     figures_dir = root / "figures"
     eval_dir.mkdir(exist_ok=True)
@@ -297,7 +306,7 @@ def main() -> None:
         "--harmful-n",   str(args.harmful_n),
         "--benign-agg-n", str(args.benign_agg_n),
         "--layers", *layers_str,
-        "--target-layer", str(args.stability_layers[-1]),
+        "--target-layer", str(stability_layers[-1]),
         "--output-dir", str(eval_dir),
         "--seed", str(args.seed),
     ], log_dir, "02_stability")
@@ -317,20 +326,39 @@ def main() -> None:
     ], log_dir, "03_evaluate")
 
     # ---- 6. Theta-phi plots ----
-    for plot_layer in args.plot_layers:
-        run_step([
-            sys.executable, "scripts/plot_theta_phi_full.py",
-            "--model", args.model,
-            "--normative-n",    str(args.normative_n),
-            "--harmful-n",      str(args.harmful_n),
-            "--benign-agg-n",   str(args.benign_agg_n),
-            "--normative-fit-n", str(norm_fit_n),
-            "--harmful-fit-n",   str(harm_fit_n),
-            "--layer", str(plot_layer),
-            "--strategy", args.strategy,
-            "--figures-dir", str(figures_dir),
-            "--seed", str(args.seed),
-        ], log_dir, f"04_theta_phi_layer{plot_layer}")
+    # Generate dynamic 25% quantiles: 0%, 25%, 50%, 75%, 100% of the network depth
+    # quantile_layers =[0, L // 4, L // 2, 3 * L // 4, L - 1]
+    quantile_layers =[]
+
+    for strategy in strategies:
+        # Use a set to automatically deduplicate the layers
+        plot_layers = set(args.plot_layers + quantile_layers)
+        
+        # Read the true operating layer found during evaluation
+        best_cfg_path = eval_dir / strategy / "best_config.json"
+        if best_cfg_path.exists():
+            with open(best_cfg_path, "r") as f:
+                best_cfg = json.load(f)
+            best_layer = best_cfg.get("best_layer")
+            if best_layer is not None:
+                plot_layers.add(best_layer)
+                print(f"\n[{strategy}] Auto-added operating layer {best_layer} to plots.")
+
+        # Sort the set so we process layers sequentially from input to output
+        for plot_layer in sorted(plot_layers):
+            run_step([
+                sys.executable, "scripts/plot_theta_phi_full.py",
+                "--model", args.model,
+                "--normative-n",    str(args.normative_n),
+                "--harmful-n",      str(args.harmful_n),
+                "--benign-agg-n",   str(args.benign_agg_n),
+                "--normative-fit-n", str(norm_fit_n),
+                "--harmful-fit-n",   str(harm_fit_n),
+                "--layer", str(plot_layer),
+                "--strategy", strategy,
+                "--figures-dir", str(figures_dir),
+                "--seed", str(args.seed),
+            ], log_dir, f"04_theta_phi_{strategy}_layer{plot_layer}")
 
     # ---- 7. Write manifest ----
     manifest = {
@@ -393,13 +421,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-fit-n", type=int, default=400,
                    help="Maximum fit-N to consider during auto-tuning.")
     # Stability layers
-    p.add_argument("--stability-layers", type=int, nargs="+",
-                   default=[0, 6, 12, 19, 22],
-                   help="Layers for stability analysis.")
+    p.add_argument("--stability-layers", type=int, nargs="*",
+                   default=[],
+                   help="Layers for stability analysis. If empty, uses 25 percentage depth quantiles.")
     # Plot layers
-    p.add_argument("--plot-layers", type=int, nargs="+",
-                   default=[5, 12, 19],
-                   help="Layers for theta-phi projection plots (default: 5 12 19).")
+    p.add_argument("--plot-layers", type=int, nargs="*",
+                   default=[],
+                   help="Layers for additional theta-phi projection plots (default: empty).")
     # Strategy
     p.add_argument("--strategy", default="normative_ref",
                    choices=["normative_ref", "harmful_ref", "both"])
