@@ -202,19 +202,17 @@ def main() -> None:
         # Fit phi basis on the FIT set only (one-shot: no test data used)
         phi_pca = fit_phi_basis(X_fit, pc1_vec)
 
-        # For normative_ref, ALL harmful prompts are evaluation data —
-        # none were used for fitting, so the train/test split carries no
-        # meaning for this strategy.  Merge into a single "harm" category
-        # so the legend truthfully reflects the experimental design.
-        # For harmful_ref, keep the split to show PC1 generalises to held-out
-        # harmful examples.
+        # Setup data splits based on strategy
         if strategy == "normative_ref":
             X_harm_all = torch.cat([X_harm_train, X_harm_test], dim=0)
-            parts    = [X_norm_train, X_norm_test, X_harm_all, X_benign]
-            cat_names = ["norm_train", "norm_test", "harm", "benign"]
+            parts    =[X_norm_train, X_norm_test, X_harm_all, X_benign]
+            cat_names =["norm_train", "norm_test", "harm", "benign"]
+            # Keep flat list of prompt text perfectly aligned with tensors
+            parts_prompts = norm_train + norm_test + harm_train + harm_test + benign_prompts
         else:
-            parts    = [X_norm_train, X_norm_test, X_harm_train, X_harm_test, X_benign]
-            cat_names = ["norm_train", "norm_test", "harm_train", "harm_test", "benign"]
+            parts    =[X_norm_train, X_norm_test, X_harm_train, X_harm_test, X_benign]
+            cat_names =["norm_train", "norm_test", "harm_train", "harm_test", "benign"]
+            parts_prompts = norm_train + norm_test + harm_train + harm_test + benign_prompts
 
         sizes = [x.shape[0] for x in parts]
         X_all = torch.cat(parts, dim=0)
@@ -226,7 +224,44 @@ def main() -> None:
         theta_by_cat = {n: theta_all[idx[i]:idx[i+1]] for i, n in enumerate(cat_names)}
         phi_by_cat   = {n: phi_all[idx[i]:idx[i+1]]   for i, n in enumerate(cat_names)}
 
+        # 1. Generate the visual plot
         _plot(theta_by_cat, phi_by_cat, layer, strategy, ref_label, figures_dir, args)
+
+        # 2. Export CSV for R (ggplot2) if flag is passed
+        if args.export_csv:
+            import pandas as pd
+            from theta import ThetaBiomarker
+            
+            print("Exporting raw scores to CSV...")
+            
+            # Trick the biomarker into processing our (N, D) tensor natively
+            bm = ThetaBiomarker(n_directions=1, n_gmm_components=1, layer_indices=[0])
+            bm.fit(X_fit.unsqueeze(1))
+            scores_all = bm.score_batch(X_all.unsqueeze(1))
+            
+            # Apply exact same scoring logic as evaluate_biomarker to guarantee parity
+            if strategy == "harmful_ref":
+                scores_all = -scores_all
+                idx_norm = cat_names.index("norm_test")
+                idx_harm = cat_names.index("harm_test")
+                s_norm = scores_all[idx[idx_norm]:idx[idx_norm+1]]
+                s_harm = scores_all[idx[idx_harm]:idx[idx_harm+1]]
+                if float(np.mean(s_harm)) < float(np.mean(s_norm)):
+                    scores_all = -scores_all
+            
+            flat_labels = np.repeat(cat_names, sizes)
+            
+            df = pd.DataFrame({
+                "label": flat_labels,
+                "theta": np.round(theta_all, 5),
+                "phi": np.round(phi_all, 5),
+                "anomaly_score": np.round(scores_all, 5),
+                "prompt": parts_prompts
+            })
+            
+            out_csv = figures_dir / f"scores_{strategy}_layer{layer}.csv"
+            df.to_csv(out_csv, index=False, encoding="utf-8")
+            print(f"Saved CSV -> {out_csv}")
 
 def _plot(
     theta:       dict[str, np.ndarray],
@@ -355,6 +390,8 @@ def parse_args() -> argparse.Namespace:
                    choices=["normative_ref", "harmful_ref", "both"])
     p.add_argument("--figures-dir",     default="results/figures",
                    help="Output directory for figures.")
+    p.add_argument("--export-csv", action="store_true",
+                   help="Export raw scores and text to CSV.")
     p.add_argument("--seed",            type=int, default=42)
     return p.parse_args()
 

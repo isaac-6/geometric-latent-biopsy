@@ -328,7 +328,7 @@ def main() -> None:
     # ---- 6. Theta-phi plots ----
     # Generate dynamic 25% quantiles: 0%, 25%, 50%, 75%, 100% of the network depth
     # quantile_layers =[0, L // 4, L // 2, 3 * L // 4, L - 1]
-    quantile_layers =[]
+    quantile_layers =[0, L//2 , L-1]
 
     for strategy in strategies:
         # Use a set to automatically deduplicate the layers
@@ -346,7 +346,7 @@ def main() -> None:
 
         # Sort the set so we process layers sequentially from input to output
         for plot_layer in sorted(plot_layers):
-            run_step([
+            cmd =[
                 sys.executable, "scripts/plot_theta_phi_full.py",
                 "--model", args.model,
                 "--normative-n",    str(args.normative_n),
@@ -358,7 +358,12 @@ def main() -> None:
                 "--strategy", strategy,
                 "--figures-dir", str(figures_dir),
                 "--seed", str(args.seed),
-            ], log_dir, f"04_theta_phi_{strategy}_layer{plot_layer}")
+            ]
+            
+            if args.export_csv:
+                cmd.append("--export-csv")
+                
+            run_step(cmd, log_dir, f"04_theta_phi_{strategy}_layer{plot_layer}")
 
     # ---- 7. Write manifest ----
     manifest = {
@@ -431,6 +436,9 @@ def parse_args() -> argparse.Namespace:
     # Strategy
     p.add_argument("--strategy", default="normative_ref",
                    choices=["normative_ref", "harmful_ref", "both"])
+    # export raw scores to CSV for external analysis
+    p.add_argument("--export-csv", action="store_true",
+                   help="Export raw scores and text to CSV.")
     # Reproducibility
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()

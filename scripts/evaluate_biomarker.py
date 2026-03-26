@@ -168,10 +168,12 @@ def make_split(
         t: torch.Tensor, abs_n: int | None
     ) -> tuple[torch.Tensor, torch.Tensor]:
         N   = t.shape[0]
-        idx = rng.permutation(N)
         n_fit = int(abs_n) if abs_n is not None else max(2, int(N * train_fraction))
         n_fit = max(2, min(n_fit, N - 1))   # guard: at least 1 eval sample
-        return t[idx[:n_fit]], t[idx[n_fit:]]
+        
+        # Load_prompts() already shuffled the data. Sequential slicing guarantees 
+        # 100% parity with the plotting scripts.
+        return t[:n_fit], t[n_fit:]
 
     norm_fit, norm_eval = split_tensor(norm_acts, normative_fit_n)
     harm_fit, harm_eval = split_tensor(harm_acts, harmful_fit_n)
