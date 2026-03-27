@@ -1,4 +1,4 @@
-# LatentBiopsy — Geometric Harmful-Prompt Detection in LLM Residual Streams
+# LatentBiopsy: Geometric Harmful-Prompt Detection in LLM Residual Streams
 
 <!-- [![arXiv](https://img.shields.io/badge/arXiv-PLACEHOLDER-b31b1b.svg)](https://arxiv.org/abs/PLACEHOLDER) -->
 [![Zenodo](https://zenodo.org/badge/DOI/10.5281/zenodo.19194903.svg)](https://doi.org/10.5281/zenodo.19194903)
@@ -12,7 +12,7 @@
 
 ## Key findings
 
-We evaluate two complete model triplets — **base, instruction-tuned, and abliterated** (refusal direction surgically removed) — from the Qwen3.5-0.8B and Qwen2.5-0.5B families.
+We evaluate two complete model triplets from the Qwen3.5-0.8B and Qwen2.5-0.5B families: **base, instruction-tuned, and abliterated** (refusal direction surgically removed).
 
 | Model | Type | Layer | AUROC h/n | AUROC h/b | AUPRC h/n | Prec@90 |
 |---|---|:---:|:---:|:---:|:---:|:---:|
@@ -30,7 +30,7 @@ Three findings hold across all six variants:
 
 1. **AUROC h/b = 1.000 universally.** Harmful intent and aggressive-but-benign phrasing (XSTest) are perfectly separable in residual-stream geometry in every tested model, including both abliterated variants.
 
-2. **Geometry survives refusal ablation.** The abliterated models — constitutionally unable to produce refusals — differ by at most 0.005 AUROC h/n from their instruction-tuned counterparts. Harmful-intent geometry is dissociated from the downstream generative refusal mechanism.
+2. **Geometry survives refusal ablation.** The abliterated models (constitutionally unable to produce refusals) differ by at most 0.005 AUROC h/n from their instruction-tuned counterparts. Harmful-intent geometry is dissociated from the downstream generative refusal mechanism.
 
 3. **Opposite ring orientations across families.** In Qwen3.5-0.8B, harmful prompts are more angular from PC1 than normative prompts (outer ring, Δθ ≈ +0.63 rad). In Qwen2.5-0.5B, harmful prompts are more aligned with PC1 than normative prompts (inner ring, Δθ ≈ −0.50 rad). The direction-agnostic anomaly score handles both correctly with no architectural knowledge.
 
@@ -50,7 +50,7 @@ Given a small set of safe normative prompts, LatentBiopsy:
    ```
    s(x) = −log p(θ(x) | μ₀, σ₀²)
    ```
-   Because the score is symmetric around μ₀, it fires whether harmful prompts sit inside *or* outside the normative ring — no knowledge of ring direction required.
+   Because the score is symmetric around μ₀, it fires whether harmful prompts sit inside *or* outside the normative ring: no knowledge of ring direction required.
 
 The **theta-phi projection** visualises every prompt at polar coordinates (θ·cos φ, θ·sin φ), revealing the universal **two-ring structure** visible in all six panels below.
 
@@ -187,7 +187,7 @@ with open("data/raw/normative.txt") as f:
 acts = torch.stack([extractor.get_last_token_activations(p) for p in normative_prompts])
 biomarker.fit(acts)
 
-# Score any prompt — higher score = more anomalous
+# Score any prompt; higher score = more anomalous
 score = biomarker.score(extractor.get_last_token_activations("How do I bake a cake?"))
 print(f"Anomaly score: {score:.3f}")
 ```
@@ -197,10 +197,10 @@ print(f"Anomaly score: {score:.3f}")
 ## Running tests
 
 ```bash
-# Fast unit tests — no model download, runs in ~10 s
+# Fast unit tests; no model download, runs in ~10 s
 pytest tests/test_theta.py -v -m "not slow"
 
-# Full integration tests — downloads ~1 GB model on first run
+# Full integration tests; downloads ~1 GB model on first run
 pytest tests/test_extraction.py -v -m slow
 
 # Full test suite
@@ -217,37 +217,37 @@ All models use `--normative-fit-n 200 --no-auto-tune --seed 42`. Exact hyperpara
 <summary><b>Click to expand</b></summary>
 
 ```bash
-# Qwen3.5-0.8B — Base  (layer 20, AUROC h/n=0.9642, h/b=1.000)
+# Qwen3.5-0.8B Base  (layer 20, AUROC h/n=0.9642, h/b=1.000)
 python scripts/run_model.py \
     --model Qwen/Qwen3.5-0.8B-Base \
     --normative-n 720 --harmful-n 520 --benign-agg-n 250 \
     --normative-fit-n 200 --no-auto-tune --strategy normative_ref --seed 42
 
-# Qwen3.5-0.8B — Chat  (layer 20, AUROC h/n=0.9497, h/b=1.000)
+# Qwen3.5-0.8B Chat  (layer 20, AUROC h/n=0.9497, h/b=1.000)
 python scripts/run_model.py \
     --model Qwen/Qwen3.5-0.8B \
     --normative-n 720 --harmful-n 520 --benign-agg-n 250 \
     --normative-fit-n 200 --no-auto-tune --strategy normative_ref --seed 42
 
-# Qwen3.5-0.8B — Abliterated  (layer 20, AUROC h/n=0.9517, h/b=1.000)
+# Qwen3.5-0.8B Abliterated  (layer 20, AUROC h/n=0.9517, h/b=1.000)
 python scripts/run_model.py \
     --model prithivMLmods/Gliese-Qwen3.5-0.8B-Abliterated-Caption \
     --normative-n 720 --harmful-n 520 --benign-agg-n 250 \
     --normative-fit-n 200 --no-auto-tune --strategy normative_ref --seed 42
 
-# Qwen2.5-0.5B — Base  (layer 20, AUROC h/n=0.9585, h/b=1.000)
+# Qwen2.5-0.5B Base  (layer 20, AUROC h/n=0.9585, h/b=1.000)
 python scripts/run_model.py \
     --model Qwen/Qwen2.5-0.5B \
     --normative-n 720 --harmful-n 520 --benign-agg-n 250 \
     --normative-fit-n 200 --no-auto-tune --strategy normative_ref --seed 42
 
-# Qwen2.5-0.5B — Instruct  (layer 20, AUROC h/n=0.9420, h/b=1.000)
+# Qwen2.5-0.5B Instruct  (layer 20, AUROC h/n=0.9420, h/b=1.000)
 python scripts/run_model.py \
     --model Qwen/Qwen2.5-0.5B-Instruct \
     --normative-n 720 --harmful-n 520 --benign-agg-n 250 \
     --normative-fit-n 200 --no-auto-tune --strategy normative_ref --seed 42
 
-# Qwen2.5-0.5B — Abliterated  (best layer 10, AUROC h/n=0.9374, h/b=1.000)
+# Qwen2.5-0.5B Abliterated  (best layer 10, AUROC h/n=0.9374, h/b=1.000)
 python scripts/run_model.py \
     --model huihui-ai/Qwen2.5-0.5B-Instruct-abliterated \
     --normative-n 720 --harmful-n 520 --benign-agg-n 250 \
@@ -304,4 +304,4 @@ See also [`CITATION.cff`](CITATION.cff) for citation metadata.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT (see [LICENSE](LICENSE)).
