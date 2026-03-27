@@ -298,21 +298,25 @@ def main() -> None:
     figures_dir = root / "figures"
     eval_dir.mkdir(exist_ok=True)
     figures_dir.mkdir(exist_ok=True)
-    
-    run_step([
-        sys.executable, "scripts/stability_analysis.py",
-        "--model", args.model,
-        "--normative-n", str(args.normative_n),
-        "--harmful-n",   str(args.harmful_n),
-        "--benign-agg-n", str(args.benign_agg_n),
-        "--layers", *layers_str,
-        "--target-layer", str(stability_layers[-1]),
-        "--output-dir", str(eval_dir),
-        "--seed", str(args.seed),
-    ], log_dir, "02_stability")
+
+    if args.skip_stability:
+        print("\n[skip] Stability analysis (--skip-stability set). "
+              "Using existing stability plots.")
+    else:
+        run_step([
+            sys.executable, "scripts/stability_analysis.py",
+            "--model", args.model,
+            "--normative-n", str(args.normative_n),
+            "--harmful-n",   str(args.harmful_n),
+            "--benign-agg-n", str(args.benign_agg_n),
+            "--layers", *layers_str,
+            "--target-layer", str(stability_layers[-1]),
+            "--output-dir", str(eval_dir),
+            "--seed", str(args.seed),
+        ], log_dir, "02_stability")
 
     # ---- 5. Evaluation ----
-    run_step([
+    eval_cmd = [
         sys.executable, "scripts/evaluate_biomarker.py",
         "--model", args.model,
         "--normative-n",   str(args.normative_n),
@@ -323,7 +327,12 @@ def main() -> None:
         "--strategy", args.strategy,
         "--output-dir", str(eval_dir),
         "--seed", str(args.seed),
-    ], log_dir, "03_evaluate")
+    ]
+    if args.eval_layer is not None:
+        eval_cmd += ["--eval-layer", str(args.eval_layer)]
+    if args.skip_layer_sweep:
+        eval_cmd.append("--skip-layer-sweep")
+    run_step(eval_cmd, log_dir, "03_evaluate")
 
     # ---- 6. Theta-phi plots ----
     # Generate dynamic 25% quantiles: 0%, 25%, 50%, 75%, 100% of the network depth
@@ -381,6 +390,10 @@ def main() -> None:
         "harmful_n":           args.harmful_n,
         "benign_agg_n":        args.benign_agg_n,
         "strategy":            args.strategy,
+        "eval_layer":          args.eval_layer,
+        "layer_source":        "fixed" if args.eval_layer is not None else "argmax",
+        "skip_stability":      args.skip_stability,
+        "skip_layer_sweep":    args.skip_layer_sweep,
         "plot_layers":         args.plot_layers,
         "seed":                args.seed,
         "command":             " ".join(sys.argv),
@@ -436,6 +449,23 @@ def parse_args() -> argparse.Namespace:
     # Strategy
     p.add_argument("--strategy", default="normative_ref",
                    choices=["normative_ref", "harmful_ref", "both"])
+    # Fixed operating layer — passed to evaluate_biomarker.py
+    p.add_argument("--eval-layer", type=str, default=None,
+                   help="Fix the layer used for score distributions, PR curves, "
+                        "and statistics (passed to evaluate_biomarker.py). "
+                        "Accepts an integer index or 'last' (resolves to the final "
+                        "layer at runtime). When set, no harmful data is needed for "
+                        "layer selection. Use 'last' for a fully architecture-determined "
+                        "reproducible choice.")
+    p.add_argument("--skip-stability", action="store_true", default=False,
+                   help="Skip the stability analysis step (stability_analysis.py). "
+                        "Use when stability plots already exist from a previous run "
+                        "and only the evaluation at a new layer is needed.")
+    p.add_argument("--skip-layer-sweep", action="store_true", default=False,
+                   help="Pass --skip-layer-sweep to evaluate_biomarker.py, skipping "
+                        "the full per-layer AUROC sweep. Requires --eval-layer. "
+                        "Saves significant runtime when auroc_by_layer.png already "
+                        "exists and only Exp 2/3 need regenerating.")
     # export raw scores to CSV for external analysis
     p.add_argument("--export-csv", action="store_true",
                    help="Export raw scores and text to CSV.")

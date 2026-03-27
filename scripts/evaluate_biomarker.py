@@ -857,6 +857,14 @@ def main() -> None:
     RESULTS_BASE = Path(args.output_dir)
     random.seed(args.seed)
 
+    # ---- Validate layer-selection arguments ----
+    if args.skip_layer_sweep and args.eval_layer is None:
+        raise ValueError(
+            "--skip-layer-sweep requires --eval-layer to be set "
+            "(use an integer index or 'last'). "
+            "Without a fixed layer there is nothing to evaluate at."
+        )
+
     strategies = (["normative_ref", "harmful_ref"]
                   if args.strategy == "both"
                   else [args.strategy])
@@ -905,6 +913,27 @@ def main() -> None:
     K_values = [1, 2, 3, 4]
     D        = norm_acts.shape[-1]
 
+    # ---- Resolve --eval-layer ----
+    # Do this after the model is loaded so L is known.
+    if args.eval_layer is None:
+        resolved_eval_layer: int | None = None
+    elif str(args.eval_layer).lower() == "last":
+        resolved_eval_layer = L - 1
+        print(f"\n  --eval-layer 'last' resolved to layer {resolved_eval_layer} "
+              f"(model has {L} layers, 0-indexed).")
+    else:
+        try:
+            resolved_eval_layer = int(args.eval_layer)
+        except ValueError:
+            raise ValueError(
+                f"--eval-layer must be an integer or 'last', got: {args.eval_layer!r}"
+            )
+        if not (0 <= resolved_eval_layer < L):
+            raise ValueError(
+                f"--eval-layer {resolved_eval_layer} is out of range "
+                f"for a model with {L} layers (valid: 0–{L - 1})."
+            )
+
     all_stat_rows: list[dict] = []
 
     # ======================================================================
@@ -919,28 +948,53 @@ def main() -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # ------------------------------------------------------------------
-        # Exp 1: Per-layer AUROC across K
+        # Exp 1: Per-layer AUROC across K  (skippable)
         # ------------------------------------------------------------------
-        print(f"\n[Exp 1 / {strategy}] Per-layer AUROC across K directions...")
-        (auroc_harm_by_K, auroc_benign_by_K,
-         auroc_cos, auroc_l2, _, auroc_raw_th, auroc_biv) = run_strategy(
-            strategy, split, layers, K_values, args.seed
-        )
+        if args.skip_layer_sweep:
+            print(f"\n[Exp 1 / {strategy}] Skipped (--skip-layer-sweep). "
+                  f"Using fixed eval-layer={args.eval_layer}.")
+            # Compute K-ablation summary at the fixed layer only, so the
+            # console output is still informative without a full sweep.
+            auroc_harm_by_K = None
+            auroc_cos       = None
+        else:
+            print(f"\n[Exp 1 / {strategy}] Per-layer AUROC across K directions...")
+            (auroc_harm_by_K, auroc_benign_by_K,
+             auroc_cos, auroc_l2, _, auroc_raw_th, auroc_biv) = run_strategy(
+                strategy, split, layers, K_values, args.seed
+            )
 
-        plot_per_layer_auroc(
-            layers, auroc_harm_by_K, auroc_benign_by_K,
-            auroc_cos, auroc_l2, strategy, out_dir,
-            auroc_raw_theta=auroc_raw_th,
-            auroc_bivariate=auroc_biv,
-        )
+            plot_per_layer_auroc(
+                layers, auroc_harm_by_K, auroc_benign_by_K,
+                auroc_cos, auroc_l2, strategy, out_dir,
+                auroc_raw_theta=auroc_raw_th,
+                auroc_bivariate=auroc_biv,
+            )
+
+        # ------------------------------------------------------------------
+        # Determine the operating layer for Exp 2 and Exp 3.
+        # ------------------------------------------------------------------
+        if resolved_eval_layer is not None:
+            # Fixed by the caller — no harmful data used for layer selection.
+            operating_layer = resolved_eval_layer
+            operating_K     = 1    # K=1 is the primary detector regardless
+            print(f"\n  Operating layer fixed by --eval-layer: {operating_layer}")
+        else:
+            # Original behaviour: argmax over harmful AUROC.
+            # Note: this uses the harmful eval set for layer selection.
+            assert auroc_harm_by_K is not None, \
+                "Layer sweep required when --eval-layer is not set."
+            operating_K     = max(K_values, key=lambda K: max(auroc_harm_by_K[K]))
+            operating_layer = int(np.argmax(auroc_harm_by_K[operating_K]))
+            print(f"\n  Operating layer selected by argmax: "
+                  f"K={operating_K}, layer={operating_layer}")
 
         # ------------------------------------------------------------------
         # Exp 2: Dimension pruning ablation (normative_ref only)
         # ------------------------------------------------------------------
         if strategy == "normative_ref":
-            print(f"\n[Exp 2 / {strategy}] Dimension pruning ablation...")
-            best_layer_K1 = int(np.argmax(auroc_harm_by_K[1]))
-            print(f"  Best layer (K=1, harm AUROC): {best_layer_K1}")
+            print(f"\n[Exp 2 / {strategy}] Dimension pruning ablation "
+                  f"at layer {operating_layer}...")
 
             dim_fracs: list[float] = [0.01, 0.05, 0.1, 0.25, 0.5, 1.0]
             _ints: list[int] = sorted(set(max(1, int(f * D)) for f in dim_fracs))
@@ -951,7 +1005,7 @@ def main() -> None:
             dim_labels:     list[str]   = []
 
             for top_d in dim_values:
-                sc = scores_normative_ref(split, best_layer_K1, K=2,
+                sc = scores_normative_ref(split, operating_layer, K=2,
                                           top_d_dims=top_d)
                 auroc_dim_harm.append(_auroc(sc["norm"], sc["harm"]))
                 auroc_dim_ben.append(_auroc(sc["benign"], sc["harm"]))
@@ -959,29 +1013,32 @@ def main() -> None:
 
             plot_dimension_ablation(
                 dim_labels, auroc_dim_harm, auroc_dim_ben,
-                best_layer_K1, out_dir,
+                operating_layer, out_dir,
             )
 
         # ------------------------------------------------------------------
         # Exp 3: Score distributions, PR curves, statistical tests
         # ------------------------------------------------------------------
-        print(f"\n[Exp 3 / {strategy}] Score distributions and statistics...")
-        best_K     = max(K_values, key=lambda K: max(auroc_harm_by_K[K]))
-        best_layer = int(np.argmax(auroc_harm_by_K[best_K]))
-        print(f"  Best config: K={best_K}, layer={best_layer}")
+        print(f"\n[Exp 3 / {strategy}] Score distributions and statistics "
+              f"at layer {operating_layer}, K={operating_K}...")
 
         strategy_fn = (scores_normative_ref
                        if strategy == "normative_ref"
                        else scores_harmful_ref)
-        sc = strategy_fn(split, best_layer, best_K)
+        sc = strategy_fn(split, operating_layer, operating_K)
 
-        plot_score_distributions(sc, best_layer, best_K, strategy, out_dir)
-        plot_precision_recall(sc, best_layer, best_K, strategy, out_dir)
+        plot_score_distributions(sc, operating_layer, operating_K, strategy, out_dir)
+        plot_precision_recall(sc, operating_layer, operating_K, strategy, out_dir)
 
-        # Save best config for downstream scripts (like run_model.py)
+        # Save operating config for downstream scripts (e.g. run_model.py
+        # uses best_config.json to know which layer to theta-phi plot).
         import json
         with open(out_dir / "best_config.json", "w") as f:
-            json.dump({"best_layer": best_layer, "best_K": best_K}, f)
+            json.dump({
+                "best_layer":    operating_layer,
+                "best_K":        operating_K,
+                "layer_source":  "fixed" if args.eval_layer is not None else "argmax",
+            }, f)
 
         # Theta statistics per category
         print("\n  Theta (raw) statistics per eval category:")
@@ -993,27 +1050,50 @@ def main() -> None:
             print(f"  {label:<14}  {t.mean():>6.3f}  "
                   f"{np.median(t):>6.3f}  {t.std():>6.3f}  {len(t)}")
 
-        # K-ablation summary: max K=1 AUROC vs best K>1 at the same layer
-        k1_best = float(max(auroc_harm_by_K[1]))
-        k1_best_layer = int(np.argmax(auroc_harm_by_K[1]))
-        other_K_at_same = [auroc_harm_by_K[K][k1_best_layer]
-                           for K in K_values if K > 1]
-        max_other = max(other_K_at_same) if other_K_at_same else float("nan")
-        cosine_at_best = auroc_cos[k1_best_layer]
-        print(f"\n  K-ablation at best K=1 layer ({k1_best_layer}):")
-        print(f"    K=1 AUROC:             {k1_best:.4f}")
-        print(f"    Best K>1 AUROC:        {max_other:.4f}  (delta={max_other-k1_best:+.4f})")
-        print(f"    Cosine baseline AUROC: {cosine_at_best:.4f}  (delta={cosine_at_best-k1_best:+.4f})")
+        # K-ablation summary at operating layer.
+        # If the layer sweep was skipped we compute the three values on-demand
+        # (one fit per K value — fast, only at one layer).
+        k1_auroc = _auroc(
+            scores_normative_ref(split, operating_layer, K=1)["norm"],
+            scores_normative_ref(split, operating_layer, K=1)["harm"],
+        ) if strategy == "normative_ref" else _auroc(
+            scores_harmful_ref(split, operating_layer, K=1)["norm"],
+            scores_harmful_ref(split, operating_layer, K=1)["harm"],
+        )
+
+        if auroc_harm_by_K is not None:
+            # Full sweep was run — read from cached arrays for efficiency.
+            other_K_at_layer = [auroc_harm_by_K[K][operating_layer]
+                                 for K in K_values if K > 1]
+            cos_at_layer = auroc_cos[operating_layer]
+        else:
+            # Sweep was skipped — compute on-demand at operating_layer.
+            strategy_fn_k = (scores_normative_ref if strategy == "normative_ref"
+                             else scores_harmful_ref)
+            other_K_at_layer = [
+                _auroc(strategy_fn_k(split, operating_layer, K)["norm"],
+                       strategy_fn_k(split, operating_layer, K)["harm"])
+                for K in K_values if K > 1
+            ]
+            cos_at_layer = _auroc(
+                baseline_cosine(split, operating_layer)["norm"],
+                baseline_cosine(split, operating_layer)["harm"],
+            )
+
+        max_other = max(other_K_at_layer) if other_K_at_layer else float("nan")
+        print(f"\n  K-ablation at operating layer ({operating_layer}):")
+        print(f"    K=1 AUROC:             {k1_auroc:.4f}")
+        print(f"    Best K>1 AUROC:        {max_other:.4f}  "
+              f"(delta={max_other - k1_auroc:+.4f})")
+        print(f"    Cosine baseline AUROC: {cos_at_layer:.4f}  "
+              f"(delta={cos_at_layer - k1_auroc:+.4f})")
 
         # Statistical tests
-        # Statistical tests — use per-strategy comparison config
-        # COMPARISON_CONFIGS ensures correct neg/pos direction for each strategy,
-        # guaranteeing AUROC >= 0.5 and semantically meaningful comparisons.
         for comp_label, neg_key, pos_key in COMPARISON_CONFIGS[strategy]:
             neg = sc[neg_key]
             pos = sc[pos_key]
             all_stat_rows.append(
-                full_row(comp_label, strategy, best_layer, best_K, neg, pos)
+                full_row(comp_label, strategy, operating_layer, operating_K, neg, pos)
             )
 
     # ---- Write unified stats CSV ----
@@ -1061,7 +1141,24 @@ def parse_args() -> argparse.Namespace:
                         "time. 'harmful_ref' is a supervised variant. "
                         "'both' runs sequentially. Default: normative_ref")
     p.add_argument("--output-dir",      default="results/eval",
-                   help="Root directory for all eval outputs. ""Default: results/eval. Override to results/<model>/eval ""when running via run_model.py.")
+                   help="Root directory for all eval outputs. "
+                        "Default: results/eval. Override to results/<model>/eval "
+                        "when running via run_model.py.")
+    p.add_argument("--eval-layer",      type=str, default=None,
+                   help="Fix the operating layer for Exp 2/3 (score distributions, "
+                        "PR curves, statistics). Accepts an integer index (e.g. '23') "
+                        "or the special value 'last', which resolves to the final "
+                        "residual-stream layer at runtime after the model is loaded. "
+                        "When set, no harmful data is needed for layer selection. "
+                        "Exp 1 (per-layer sweep) still runs unless --skip-layer-sweep "
+                        "is also set.")
+    p.add_argument("--skip-layer-sweep", action="store_true", default=False,
+                   help="Skip Exp 1 (per-layer AUROC sweep across all layers and K). "
+                        "Requires --eval-layer to be set. Useful when the auroc_by_layer "
+                        "figure already exists from a previous run and only the "
+                        "score distributions / PR curves / statistics at a fixed layer "
+                        "need to be regenerated. Reduces runtime from O(L*K) to O(1) "
+                        "model passes.")
     p.add_argument("--seed",            type=int, default=42)
     return p.parse_args()
 

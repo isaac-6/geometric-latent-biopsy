@@ -48,5 +48,4 @@ Thumbs.db
 htmlcov/
 
 # experimental
-scripts/benchmark_inference.py
 .beta
