@@ -60,9 +60,9 @@ The **theta-phi projection** visualises every prompt at polar coordinates (θ·c
 
 <!-- *Theta-phi projections at the operating layer for all six model variants. Top row: Qwen3.5-0.8B (Base, Chat, Abliterated) — harmful prompts (red ×) form the **outer** ring. Bottom row: Qwen2.5-0.5B (Base, Instruct, Abliterated) — harmful prompts form the **inner** ring. Benign-aggressive prompts (green ▲) are always far from harmful (AUROC h/b = 1.000 in all six panels). The three Qwen3.5-0.8B panels are visually indistinguishable, demonstrating that abliteration does not displace the harmful cluster.* -->
 
-![Theta-phi projection; two-ring structure](assets/Qwen2.5-0.5B_theta_phi_normative_ref_layer12.png)
+![Theta-phi projection; two-ring structure](assets/theta_phi_normative_ref_layer20.png)
 
-*Theta-phi projection, Qwen2.5-0.5B base, layer 12. Radial distance = θ (angular deviation from normative PC1). Harmful prompts (red ×) form the inner ring; normative prompts (blue ●) the outer ring; benign-aggressive XSTest prompts (green ▲) co-localise with the normative class.*
+*Theta-phi projection, Qwen3.5-0.8B-Base, layer 20. Radial distance = θ (angular deviation from normative PC1). Harmful prompts (red ×) form the inner ring; normative prompts (blue ●) the outer ring; benign-aggressive XSTest prompts (green ▲) co-localise with the normative class.*
 
 > Figures are generated automatically per model into `results/<model_slug>/figures/theta_phi_normative_ref_layer<layer_number>.png`.
 
