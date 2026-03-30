@@ -284,6 +284,14 @@ Measured on an NVIDIA RTX 3070 Laptop GPU (8 GB VRAM), averaged over 100 trials.
 
 ---
 
+## Ethical Statement
+
+**LatentBiopsy** is released as a diagnostic framework to advance AI safety, interpretability, and alignment. While we acknowledge the inherent dual-use potential of latent interpretability tools, we believe that democratising the ability to detect harmful intent is a net positive: it reduces the community's reliance on opaque, proprietary safety filters and enables transparent verification of model alignment. 
+
+We do not provide, encourage, or facilitate the generation of harmful content. We strictly advocate for the use of this codebase to improve model robustness and encourage researchers to follow community norms of responsible disclosure when identifying vulnerabilities in deployed models.
+
+---
+
 ## Citation
 
 ```bibtex
