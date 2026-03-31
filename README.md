@@ -1,6 +1,6 @@
 # LatentBiopsy: Geometric Harmful-Prompt Detection in LLM Residual Streams
 
-<!-- [![arXiv](https://img.shields.io/badge/arXiv-PLACEHOLDER-b31b1b.svg)](https://arxiv.org/abs/PLACEHOLDER) -->
+[![arXiv](https://img.shields.io/badge/arXiv-2603.27412-b31b1b.svg)](https://arxiv.org/abs/2603.27412)
 [![Zenodo](https://zenodo.org/badge/DOI/10.5281/zenodo.19194903.svg)](https://doi.org/10.5281/zenodo.19194903)
 [![Tests](https://github.com/isaac-6/geometric-latent-biopsy/actions/workflows/tests.yml/badge.svg)](https://github.com/isaac-6/geometric-latent-biopsy/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -295,14 +295,14 @@ We do not provide, encourage, or facilitate the generation of harmful content. W
 ## Citation
 
 ```bibtex
-@misc{llorente2025latentbiopsy,
-  title         = {The Geometry of Harmful Intent: Training-Free Anomaly Detection
-                   via Angular Deviation in {LLM} Residual Streams},
+@misc{llorente2026latentbiopsy,
+  title         = {The Geometry of Harmful Intent: Training-Free Anomaly Detection via Angular Deviation in {LLM} Residual Streams},
   author        = {Llorente-Saguer, Isaac},
-  howpublished  = {arXiv preprint arXiv:PLACEHOLDER},
-  year          = {2025},
-  url           = {https://github.com/isaac-6/geometric-latent-biopsy},
-  doi           = {10.5281/zenodo.19194903}
+  year          = {2026},
+  eprint        = {2603.27412},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.LG}, 
+  url           = {https://arxiv.org/abs/2603.27412}
 }
 ```
 

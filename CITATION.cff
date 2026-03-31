@@ -1,5 +1,5 @@
-cff-version: 1.0.0
-title: "Geometric Latent Biopsy: Zero-Shot Anomaly Detection in LLM Residual Streams"
+cff-version: 1.3.0
+title: "LatentBiopsy: Zero-Shot Anomaly Detection in LLM Residual Streams"
 message: "If you use this software, please cite it as below."
 type: software
 authors:
@@ -8,8 +8,8 @@ authors:
     orcid: "https://orcid.org/0000-0002-7612-5331"
 repository-code: "https://github.com/isaac-6/geometric-latent-biopsy"
 license: MIT
-version: "1.0.0"
-date-released: "2026-03-23"
+version: "1.3.0"
+date-released: "2026-03-31"
 keywords:
   - large-language-models
   - anomaly-detection
@@ -26,3 +26,13 @@ abstract: >-
   representations, using PCA-derived reference directions and
   Gaussian Mixture Model scoring. No harmful examples are required
   at fit time under the normative reference strategy.
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Llorente-Saguer"
+      given-names: "Isaac"
+      orcid: "https://orcid.org/0000-0002-7612-5331"
+  title: "The Geometry of Harmful Intent: Training-Free Anomaly Detection via Angular Deviation in LLM Residual Streams"
+  year: 2026
+  journal: "arXiv preprint arXiv:2603.27412"
+  url: "https://arxiv.org/abs/2603.27412"
