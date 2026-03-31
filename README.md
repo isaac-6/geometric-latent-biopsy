@@ -86,11 +86,7 @@ geometric-latent-biopsy/
 │   ├── evaluate_biomarker.py     # Per-layer AUROC, K-ablation, PR curves
 │   ├── stability_analysis.py     # Normative set size vs AUROC stability curves
 │   ├── plot_theta_phi_full.py    # Theta-phi projections (full datasets)
-│   ├── download_datasets.py      # Download Alpaca-Cleaned / AdvBench / XSTest
-│   ├── analyze_topology.py       # Pairwise angular distance analysis
-│   ├── run_first_biopsy.py       # Minimal single-prompt demo
-│   ├── plot_pc1_reference.py     # PC1 reference visualisation
-│   └── plot_theta_phi_plane.py   # Theta-phi plane (small, manual prompts)
+│   └── download_datasets.py      # Download Alpaca-Cleaned / AdvBench / XSTest
 │
 ├── tests/                        # Test suite
 │   ├── __init__.py
