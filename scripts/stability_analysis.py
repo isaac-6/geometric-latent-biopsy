@@ -59,8 +59,8 @@ _SRC = Path(__file__).resolve().parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from extraction import LatentExtractor   # type: ignore[import-untyped]
-from theta import ThetaBiomarker         # type: ignore[import-untyped]
+from latentbiopsy.extraction import LatentExtractor   # type: ignore[import-untyped]
+from latentbiopsy.theta import ThetaBiomarker         # type: ignore[import-untyped]
 
 RESULTS_DIR = Path("results/eval")  # overridden at runtime by --output-dir
 

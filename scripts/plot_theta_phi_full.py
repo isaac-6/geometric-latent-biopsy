@@ -69,8 +69,8 @@ _SRC = Path(__file__).resolve().parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from extraction import LatentExtractor   # type: ignore[import-untyped]
-from theta import compute_theta_core     # type: ignore[import-untyped]
+from latentbiopsy.extraction import LatentExtractor   # type: ignore[import-untyped]
+from latentbiopsy.theta import compute_theta_core     # type: ignore[import-untyped]
 
 
 # ---------------------------------------------------------------------------
@@ -230,7 +230,7 @@ def main() -> None:
         # 2. Export CSV for R (ggplot2) if flag is passed
         if args.export_csv:
             import pandas as pd
-            from theta import ThetaBiomarker
+            from latentbiopsy.theta import ThetaBiomarker
             
             print("Exporting raw scores to CSV...")
             
