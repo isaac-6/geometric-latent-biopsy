@@ -169,8 +169,8 @@ All outputs are written to `results/Qwen__Qwen3.5-0.8B/`:
 ### 4. Score a single prompt
 
 ```python
-from src.extraction import LatentExtractor
-from src.theta import ThetaBiomarker
+from latentbiopsy.extraction import LatentExtractor
+from latentbiopsy.theta import ThetaBiomarker
 import torch
 
 # Load model and fit on normative prompts

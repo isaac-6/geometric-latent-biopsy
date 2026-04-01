@@ -33,10 +33,12 @@ Key design choices
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
 import torch
+import joblib
 from sklearn.decomposition import PCA
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
@@ -97,6 +99,9 @@ class ThetaBiomarker:
     random_state : int
         Seed for GMM fitting reproducibility.
     """
+
+    model_id: str | None = None
+    fit_n: int | None = None
 
     def __init__(
         self,
@@ -355,6 +360,112 @@ class ThetaBiomarker:
             angles = self._compute_angles_numpy(x_sel[None, :], self._pca_models[i])
             parts.append(angles)
         return np.concatenate(parts, axis=1)  # (1, n_layers * K)
+
+
+    def save(
+        self,
+        filepath: "str | Path",
+        *,
+        model_id: "str | None" = None,
+        fit_n: "int | None" = None,
+    ) -> None:
+        """
+        Persist the fitted biomarker to disk.
+
+        The file contains all constructor parameters, all fitted sklearn
+        objects (PCA, GMM, StandardScaler), and optional metadata.
+        joblib is used because sklearn recommends it for serialising its own
+        objects; it handles numpy arrays and torch tensors transparently.
+
+        Parameters
+        ----------
+        filepath:
+            Destination path (any extension; .pkl is conventional).
+            The parent directory is created if it does not exist.
+        model_id:
+            HuggingFace model ID used at fit time.  Stored as metadata and
+            surfaced as ``biomarker.model_id`` after load(); used by score.py
+            to warn on model mismatch.
+        fit_n:
+            Number of normative prompts used for fitting.  Stored as metadata.
+
+        Raises
+        ------
+        RuntimeError
+            If called before fit().
+        """
+        self._check_fitted()
+
+        filepath = Path(filepath)
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+
+        state = {
+            # ---- constructor params (needed to reconstruct the instance) ----
+            "n_directions":     self.n_directions,
+            "n_gmm_components": self.n_gmm_components,
+            "top_d_dims":       self.top_d_dims,
+            "layer_indices":    self.layer_indices,
+            "random_state":     self.random_state,
+            # ---- fitted attributes ------------------------------------------
+            "_dim_indices":     self._dim_indices,
+            "_pca_models":      self._pca_models,
+            "_gmm":             self._gmm,
+            "_scaler":          self._scaler,
+            "_n_layers":        self._n_layers,
+            "centroids":        self.centroids,
+            # ---- metadata (informational only) ------------------------------
+            "model_id":         model_id,
+            "fit_n":            fit_n,
+        }
+
+        joblib.dump(state, filepath)
+
+    @classmethod
+    def load(cls, filepath: "str | Path") -> "ThetaBiomarker":
+        """
+        Load a fitted biomarker from disk.
+
+        Parameters
+        ----------
+        filepath:
+            Path to a .pkl file produced by save().
+
+        Returns
+        -------
+        ThetaBiomarker
+            A fully fitted instance ready for score() and score_batch().
+
+        Raises
+        ------
+        FileNotFoundError
+            If filepath does not exist.
+        """
+        filepath = Path(filepath)
+        if not filepath.exists():
+            raise FileNotFoundError(f"No saved biomarker found at '{filepath}'.")
+
+        state = joblib.load(filepath)
+
+        instance = cls(
+            n_directions=     state["n_directions"],
+            n_gmm_components= state["n_gmm_components"],
+            top_d_dims=       state["top_d_dims"],
+            layer_indices=    state["layer_indices"],
+            random_state=     state["random_state"],
+        )
+
+        instance._dim_indices = state["_dim_indices"]
+        instance._pca_models  = state["_pca_models"]
+        instance._gmm         = state["_gmm"]
+        instance._scaler      = state["_scaler"]
+        instance._n_layers    = state["_n_layers"]
+        instance.centroids    = state["centroids"]
+
+        # Surface metadata as readable attributes (no effect on scoring)
+        instance.model_id = state.get("model_id")
+        instance.fit_n    = state.get("fit_n")
+
+        return instance
 
     def _check_fitted(self):
         if self._gmm is None:

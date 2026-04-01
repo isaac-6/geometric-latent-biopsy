@@ -984,8 +984,9 @@ def main() -> None:
             # Note: this uses the harmful eval set for layer selection.
             assert auroc_harm_by_K is not None, \
                 "Layer sweep required when --eval-layer is not set."
-            operating_K     = max(K_values, key=lambda K: max(auroc_harm_by_K[K]))
-            operating_layer = int(np.argmax(auroc_harm_by_K[operating_K]))
+            metrics_dict: dict[int, list[float]] = auroc_harm_by_K            
+            operating_K     = max(K_values, key=lambda K: max(metrics_dict[K]))
+            operating_layer = int(np.argmax(metrics_dict[operating_K]))
             print(f"\n  Operating layer selected by argmax: "
                   f"K={operating_K}, layer={operating_layer}")
 
@@ -1040,6 +1041,24 @@ def main() -> None:
                 "layer_source":  "fixed" if args.eval_layer is not None else "argmax",
             }, f)
 
+        # Re-fit at the operating (layer, K) to produce a serialisable biomarker.
+        # normative_ref only: this is the zero-shot profile users will distribute.
+        # harmful_ref is a supervised variant and is intentionally excluded.
+        if strategy == "normative_ref":
+            _bm = ThetaBiomarker(
+                n_directions=operating_K,
+                n_gmm_components=1,
+                layer_indices=[operating_layer],
+            )
+            _bm.fit(split.norm_fit)
+            _profile_path = out_dir / f"biomarker_layer{operating_layer}.pkl"
+            _bm.save(
+                _profile_path,
+                model_id=args.model,
+                fit_n=int(split.norm_fit.shape[0]),
+            )
+            print(f"  Saved reference profile → {_profile_path}")
+
         # Theta statistics per category
         print("\n  Theta (raw) statistics per eval category:")
         print(f"  {'Category':<14}  {'mean':>6}  {'median':>6}  {'std':>6}  n")
@@ -1062,6 +1081,7 @@ def main() -> None:
         )
 
         if auroc_harm_by_K is not None:
+            assert auroc_cos is not None, "auroc_cos should be available if auroc_harm_by_K is available"
             # Full sweep was run — read from cached arrays for efficiency.
             other_K_at_layer = [auroc_harm_by_K[K][operating_layer]
                                  for K in K_values if K > 1]

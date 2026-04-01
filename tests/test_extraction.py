@@ -26,7 +26,7 @@ MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
 
 @pytest.fixture(scope="module")
 def extractor():
-    from src.extraction import LatentExtractor
+    from latentbiopsy.extraction import LatentExtractor
     return LatentExtractor(model_name=MODEL_NAME)
 
 

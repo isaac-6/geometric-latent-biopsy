@@ -1,6 +1,6 @@
 [project]
 name = "latentbiopsy"
-version = "1.0.0"
+version = "1.2.0"
 description = "Geometric anomaly detection in LLM residual streams; training-free harmful-prompt detection"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -38,9 +38,16 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8.0.0"]
 
+[tool.setuptools.packages.find]
+where = ["src"] 
+
+[project.scripts]
+lb-fit = "latentbiopsy.cli:fit_main"
+lb-score = "latentbiopsy.cli:score_main"
+
 [project.urls]
 Repository = "https://github.com/isaac-6/geometric-latent-biopsy"
-Paper      = "..."   # soon to be updated after arXiv submission
+Paper      = "https://arxiv.org/abs/2603.27412"  
 
 # ---------------------------------------------------------------------------
 # pytest configuration

@@ -22,7 +22,7 @@ import numpy as np
 import pytest
 import torch
 
-from src.theta import ThetaBiomarker, compute_theta_core
+from latentbiopsy.theta import ThetaBiomarker, compute_theta_core
 
 
 # ---------------------------------------------------------------------------
