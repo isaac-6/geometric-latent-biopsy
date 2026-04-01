@@ -95,7 +95,7 @@ def auto_tune_fit_n(
     _SRC = Path(__file__).resolve().parent.parent / "src"
     if str(_SRC) not in sys.path:
         sys.path.insert(0, str(_SRC))
-    from theta import ThetaBiomarker   # type: ignore[import-untyped]
+    from latentbiopsy.theta import ThetaBiomarker   # type: ignore[import-untyped]
     from sklearn.metrics import roc_auc_score
 
     rng = np.random.default_rng(seed)
@@ -203,7 +203,10 @@ def main() -> None:
     random.seed(args.seed)
 
     slug  = model_slug(args.model)
-    root  = Path(f"results/{slug}")
+
+    # Append the suffix if provided
+    root_folder_name = f"{slug}{args.suffix}"
+    root  = Path(f"results/{root_folder_name}")
     root.mkdir(parents=True, exist_ok=True)
     log_dir = root / "logs"
     log_dir.mkdir(exist_ok=True)
@@ -228,7 +231,7 @@ def main() -> None:
     _SRC = Path(__file__).resolve().parent.parent / "src"
     if str(_SRC) not in sys.path:
         sys.path.insert(0, str(_SRC))
-    from extraction import LatentExtractor   # type: ignore[import-untyped]
+    from latentbiopsy.extraction import LatentExtractor   # type: ignore[import-untyped]
 
     def load_prompts(path: str, n: int) -> list[str]:
         with open(path, encoding="utf-8") as f:
@@ -466,6 +469,8 @@ def parse_args() -> argparse.Namespace:
                         "the full per-layer AUROC sweep. Requires --eval-layer. "
                         "Saves significant runtime when auroc_by_layer.png already "
                         "exists and only Exp 2/3 need regenerating.")
+    p.add_argument("--suffix", type=str, default="",
+                   help="Optional suffix to append to the results folder (e.g. '_v1.2.0').")
     # export raw scores to CSV for external analysis
     p.add_argument("--export-csv", action="store_true",
                    help="Export raw scores and text to CSV.")
