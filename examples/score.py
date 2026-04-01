@@ -25,8 +25,8 @@ import torch
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
 
-from extraction import LatentExtractor
-from theta import ThetaBiomarker
+from latentbiopsy.extraction import LatentExtractor
+from latentbiopsy.theta import ThetaBiomarker
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Score custom prompts using a saved LatentBiopsy profile.")
